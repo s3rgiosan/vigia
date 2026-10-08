@@ -89,63 +89,10 @@ No telemetry. Vigia contacts only the hosts of the accounts you add. Tokens live
 4. Drag Vigia from Applications to the Trash.
 5. Delete `~/Library/Application Support/com.s3rgiosan.vigia/` and `~/Library/Logs/com.s3rgiosan.vigia/`.
 
-## Development
-
-How the app works: [docs/architecture.md](docs/architecture.md).
-
-```sh
-npm install
-npm run tauri dev
-```
-
-`npm run symbols` exports the SF Symbols the icons use. It runs through the `predev`, `prebuild`, `pretest` and `precoverage` hooks, skips the work when the output is current, and needs macOS. When npm is configured with `ignore-scripts=true` the hooks are skipped, so run `npm run symbols` first.
-
-`npm run tauri build` produces a local `.dmg`.
-
-Debug builds skip the fine-grained check for tokens passed through `VIGIA_DEBUG_SETUP`, so `gh auth token` works there. They keep their settings in `config.dev.json` and their tokens in `tokens.dev.json`, both in `~/Library/Application Support/com.s3rgiosan.vigia/`, so they do not touch a release install or the Keychain. Three environment variables apply to them:
-
-- `VIGIA_DEBUG_SETUP`: JSON describing accounts and repos to add at launch. See `src-tauri/src/debug_setup.rs`.
-- `VIGIA_DEBUG_SHOW_POPUP`: open the popup at launch.
-- `VIGIA_DEBUG_OPEN_SETTINGS`: open Settings at launch.
-
-The tray menu of a debug build also has a Debug submenu that forces each icon state.
-
-Checks:
-
-```sh
-npm run build && npm test
-cd src-tauri && cargo fmt --check && cargo clippy --all-targets -- -D warnings && cargo test
-```
-
-Coverage: `npm run coverage` for the frontend, and `cargo cov` from `src-tauri/` for Rust (needs `cargo install cargo-llvm-cov` and `rustup component add llvm-tools-preview`).
-
-Probe one real repo without the app (`VIGIA_INCLUDE_TAGS=1` counts tag runs):
-
-```sh
-cd src-tauri
-VIGIA_GITHUB_TOKEN=... VIGIA_INCLUDE_TAGS=1 cargo run --example probe -- github owner/name
-VIGIA_GITLAB_URL=https://gitlab.example.com VIGIA_GITLAB_TOKEN=... cargo run --example probe -- gitlab group/project
-```
-
-Scripts:
-
-- `scripts/gen-tray-icons.py` generates the menu bar icons (needs Pillow).
-- `scripts/build-app-icon.sh` builds the app icon from the Icon Composer document `src-tauri/icons/AppIcon.icon` (needs Xcode 26 or later).
-- `scripts/export-symbols.swift` exports the SF Symbols as `src/assets/symbols/*.png` and `symbols.css`; the output is generated and not tracked.
-- `scripts/third-party-licenses.sh` regenerates `THIRD-PARTY-LICENSES.md`.
-- `scripts/webkit-snapshot.swift <url> <width> <height> <out.png> <light|dark> [script]` renders a page in WebKit, the engine the app uses, so system colors resolve as they do in the app.
-- `scripts/appkit-reference.swift <dir>` renders the matching real AppKit controls for comparison.
-
-Design previews: `npm run dev` serves the windows with fake data at `http://localhost:1420/?view=popup`, `?view=settings` and `?view=gallery` (every control). Add `&scenario=` with `empty`, `banners`, `config_error`, `keychain` or `many` to preview those states.
-
-## Release
-
-1. Set the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
-2. Add a `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md` (Keep a Changelog: `### Added`, `### Changed`, `### Fixed`, …) and update the link references at the bottom of the file.
-3. Push a tag with the same plain semver number and no `v` prefix, for example `1.0.0`.
-
-The release workflow runs the checks, verifies that the tag and the three versions match, builds a universal ad-hoc signed `.dmg`, and attaches it to a draft release. Publish the draft after testing the `.dmg`.
-
 ## Licences
 
-Vigia is MIT licensed; see `LICENSE`. Third-party notices are in `THIRD-PARTY-LICENSES.md`; regenerate them with `sh scripts/third-party-licenses.sh`. The icons use SF Symbols that are generated on the build machine from macOS and are not distributed in this repository.
+Vigia is MIT licensed; see `LICENSE`. Third-party notices are in `THIRD-PARTY-LICENSES.md`. The icons use SF Symbols that are generated on the build machine from macOS and are not distributed in this repository.
+
+## Contributing
+
+Building from source or contributing: see [CONTRIBUTING.md](CONTRIBUTING.md).
