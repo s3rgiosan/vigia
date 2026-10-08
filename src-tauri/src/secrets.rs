@@ -42,6 +42,10 @@ impl KeychainStore {
     }
 
     fn entry(&self) -> Result<keyring::Entry, SecretError> {
+        // Denied before any store is touched: Credential Manager accepts an empty service name.
+        if self.service.is_empty() {
+            return Err(SecretError::AccessDenied("empty service name".to_string()));
+        }
         keyring::Entry::new(&self.service, ITEM_ACCOUNT)
             .map_err(|e| SecretError::AccessDenied(e.to_string()))
     }
