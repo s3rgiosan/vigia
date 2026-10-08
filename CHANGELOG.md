@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- On Windows, opening Settings from the popup or the tray menu no longer freezes Vigia with a blank Settings window.
+
 ## [1.1.0] - 2026-10-08
 
 ### Added
