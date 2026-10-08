@@ -1,0 +1,704 @@
+/*
+ * Shared tokens. Inside the app (WebKit on macOS) they resolve to the system's semantic colors,
+ * so text, separators and the accent follow light/dark mode, Increase Contrast and the user's
+ * accent choice. The plain values are fallbacks for the browser preview.
+ */
+:root {
+  color-scheme: light dark;
+
+  --label: #1d1d1f;
+  --label-secondary: rgb(60 60 67 / 72%);
+  --label-tertiary: rgb(60 60 67 / 45%);
+  --separator: rgb(0 0 0 / 10%);
+  --fill: rgb(0 0 0 / 5%);
+  --fill-strong: rgb(0 0 0 / 9%);
+  --control-bg: #fff;
+  --window-bg: #ececec;
+  --group-bg: rgb(255 255 255 / 75%);
+  --accent: #0a84ff;
+  --accent-text: #fff;
+  --selection: rgb(10 132 255 / 18%);
+  /*
+   * Solid surface for sheets. The system window background color renders as clear inside the
+   * webview, so sheets need an explicit color or the pane behind shows through.
+   */
+  --surface: #f5f5f7;
+
+  /* AppKit control geometry and fills on macOS 26 and 27. */
+  --radius-control: 6px;
+  --control-fill: rgb(0 0 0 / 8%);
+  --control-fill-strong: rgb(0 0 0 / 19%);
+  --control-fill-check: rgb(0 0 0 / 10%);
+  --field-bg: #fff;
+  --field-border: rgb(0 0 0 / 15%);
+  --radius-field: 8px;
+  --radius-row: 8px;
+  --radius-group: 12px;
+  --radius-panel: 18px;
+  --radius-sheet: 22px;
+
+  --red: #ff3b30;
+  --orange: #ff9500;
+  --yellow: #ffcc00;
+  --green: #34c759;
+  --gray: #8e8e93;
+
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--label);
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  cursor: default;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --label: #f5f5f7;
+    --label-secondary: rgb(235 235 245 / 65%);
+    --label-tertiary: rgb(235 235 245 / 38%);
+    --separator: rgb(255 255 255 / 12%);
+    --fill: rgb(255 255 255 / 7%);
+    --fill-strong: rgb(255 255 255 / 12%);
+    --control-bg: rgb(255 255 255 / 8%);
+    --window-bg: #232325;
+    --group-bg: rgb(255 255 255 / 5%);
+    --selection: rgb(10 132 255 / 30%);
+    --surface: #2b2b2e;
+    --control-fill: rgb(255 255 255 / 11%);
+    --control-fill-strong: rgb(255 255 255 / 20%);
+    --control-fill-check: rgb(255 255 255 / 10%);
+    --field-bg: rgb(0 0 0 / 25%);
+    --field-border: rgb(255 255 255 / 15%);
+
+    --red: #ff453a;
+    --orange: #ff9f0a;
+    --yellow: #ffd60a;
+    --green: #30d158;
+    --gray: #98989d;
+  }
+}
+
+@supports (color: -apple-system-label) {
+  :root {
+    --label: -apple-system-label;
+    --label-secondary: -apple-system-secondary-label;
+    --label-tertiary: -apple-system-tertiary-label;
+    --separator: -apple-system-separator;
+    --control-bg: -apple-system-control-background;
+    --window-bg: -apple-system-window-background;
+    --red: -apple-system-red;
+    --orange: -apple-system-orange;
+    --yellow: -apple-system-yellow;
+    --green: -apple-system-green;
+    --gray: -apple-system-gray;
+  }
+}
+
+/* AccentColorText resolves to black in the webview, so labels on the accent stay white. */
+@supports (color: AccentColor) {
+  :root {
+    --accent: AccentColor;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: transparent;
+}
+
+/*
+ * Controls, drawn to match AppKit on macOS 26 and 27 (measured with scripts/appkit-reference.swift):
+ * 24 pt push buttons, pop-ups and segmented controls with a 6 pt radius and a flat fill; 26 pt
+ * text and search fields with a 1 pt border; 16 pt checkboxes. WebKit's built-in form styles do
+ * not match AppKit, so every control here is styled explicitly. Fills are translucent so they work
+ * on the window background and on the popup's glass alike.
+ */
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+  cursor: default;
+}
+
+button:not([class]),
+button.default,
+button.destructive,
+button.banner__action {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--control-fill);
+  color: var(--label);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+button:not([class]):active:not(:disabled),
+button.destructive:active:not(:disabled),
+button.banner__action:active:not(:disabled) {
+  background: var(--control-fill-strong);
+}
+
+button.default {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+button.default:active:not(:disabled) {
+  filter: brightness(0.92);
+}
+
+button:not([class]):disabled,
+button.destructive:disabled,
+button.banner__action:disabled {
+  opacity: 0.45;
+}
+
+button.default:disabled {
+  background: var(--control-fill);
+  color: var(--label-tertiary);
+}
+
+button.destructive {
+  color: var(--red);
+}
+
+/* Icon-only button: a borderless glyph that shows a fill on hover and press. */
+button.icon {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--label-secondary);
+}
+
+button.icon:hover:not(:disabled) {
+  background: var(--fill);
+}
+
+button.icon:active:not(:disabled) {
+  background: var(--fill-strong);
+}
+
+button.icon:disabled {
+  opacity: 0.4;
+}
+
+.symbol {
+  display: inline-block;
+  flex: none;
+  background-color: currentcolor;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 1px;
+}
+
+/* Text field. */
+.field {
+  -webkit-appearance: none;
+  appearance: none;
+  box-sizing: border-box;
+  width: 180px;
+  height: 26px;
+  padding: 0 7px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  color: var(--label);
+  font-size: 13px;
+  cursor: text;
+}
+
+.field::placeholder {
+  color: var(--label-secondary);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.field:disabled {
+  opacity: 0.55;
+}
+
+/* Search field: a text field with a magnifying glass, not a capsule. */
+.search {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-sizing: border-box;
+  height: 26px;
+  padding: 0 7px 0 6px;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius-control);
+  background: var(--field-bg);
+  color: var(--label-secondary);
+}
+
+.search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.search input {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--label);
+  font-size: 13px;
+  cursor: text;
+}
+
+.search input::placeholder {
+  color: var(--label-secondary);
+}
+
+.search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
+/* Pop-up button: a push button showing the choice, with a native <select> laid over it. */
+.popup-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  height: 24px;
+  min-width: 100px;
+  padding: 0 8px 0 11px;
+  border-radius: var(--radius-control);
+  background: var(--control-fill);
+  font-size: 13px;
+}
+
+.popup-button__label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popup-button__chevron {
+  flex: none;
+  color: var(--label-secondary);
+}
+
+.popup-button select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.popup-button:has(select:focus-visible) {
+  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  outline-offset: 1px;
+}
+
+.popup-button--disabled {
+  opacity: 0.45;
+}
+
+/* Segmented control: a grey track; the selected segment is a darker grey, not a white pill. */
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  height: 24px;
+  border-radius: var(--radius-control);
+  background: var(--control-fill);
+}
+
+.segmented__item {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--label);
+  font-size: 13px;
+}
+
+.segmented__item--on {
+  background: var(--control-fill-strong);
+}
+
+/* Checkbox: 16 pt rounded square, accent with a white mark when on. */
+input[type="checkbox"]:not(.toggle) {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border-radius: 4px;
+  background: var(--control-fill-check);
+  box-shadow: inset 0 0 0 0.5px var(--field-border);
+}
+
+input[type="checkbox"]:not(.toggle):checked,
+input[type="checkbox"]:not(.toggle):indeterminate {
+  background: var(--accent);
+  box-shadow: none;
+}
+
+input[type="checkbox"]:not(.toggle):checked::after {
+  content: "";
+  position: absolute;
+  left: 5.5px;
+  top: 2.5px;
+  width: 3.5px;
+  height: 7.5px;
+  border: solid var(--accent-text);
+  border-width: 0 1.8px 1.8px 0;
+  transform: rotate(42deg);
+}
+
+input[type="checkbox"]:not(.toggle):indeterminate::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 7.1px;
+  width: 8px;
+  height: 1.8px;
+  border-radius: 1px;
+  background: var(--accent-text);
+}
+
+input[type="checkbox"]:not(.toggle):disabled {
+  background: var(--fill);
+  box-shadow: inset 0 0 0 0.5px color-mix(in srgb, var(--field-border) 50%, transparent);
+}
+
+input[type="checkbox"]:not(.toggle):disabled:checked,
+input[type="checkbox"]:not(.toggle):disabled:indeterminate {
+  background: var(--accent);
+  box-shadow: none;
+  opacity: 0.45;
+}
+
+input[type="checkbox"]:not(.toggle):disabled::after {
+  opacity: 0.5;
+}
+
+/* Switch: AppKit's track with a wide pill knob; WebKit's own switch is smaller than NSSwitch. */
+input[type="checkbox"].toggle {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 24px;
+  margin: 0;
+  border-radius: 12px;
+  background: var(--control-fill-strong);
+  transition: background-color 160ms ease-out;
+}
+
+input[type="checkbox"].toggle::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 26px;
+  height: 20px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow:
+    0 0 0 0.5px rgb(0 0 0 / 8%),
+    0 1px 3px rgb(0 0 0 / 22%);
+  transition: transform 160ms cubic-bezier(0.3, 0.7, 0.4, 1);
+}
+
+input[type="checkbox"].toggle:checked {
+  background: var(--accent);
+}
+
+input[type="checkbox"].toggle:checked::after {
+  transform: translateX(14px);
+}
+
+input[type="checkbox"].toggle:disabled {
+  opacity: 0.45;
+}
+
+/* Add and remove buttons under a list: one grouped control with a divider. */
+.add-remove {
+  display: inline-flex;
+  height: 24px;
+  border-radius: var(--radius-control);
+  background: var(--control-fill);
+}
+
+.add-remove button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--label);
+}
+
+.add-remove button + button {
+  box-shadow: inset 1px 0 0 0 var(--separator), inset 1px 0 0 -0.5px var(--separator);
+  background-clip: padding-box;
+}
+
+.add-remove button:first-child {
+  border-radius: var(--radius-control) 0 0 var(--radius-control);
+}
+
+.add-remove button:last-child {
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+
+.add-remove button:active:not(:disabled) {
+  background: var(--control-fill-strong);
+}
+
+.add-remove button:disabled {
+  opacity: 0.6;
+}
+
+/* Text link styled button; links are the only place a hand cursor appears. */
+button.link {
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+}
+
+button.link:hover {
+  text-decoration: underline;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.dot {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 22%);
+}
+
+.dot--red {
+  background: var(--red);
+}
+
+.dot--orange {
+  background: var(--orange);
+}
+
+.dot--yellow {
+  background: var(--yellow);
+}
+
+.dot--green {
+  background: var(--green);
+}
+
+.dot--gray {
+  background: var(--gray);
+}
+
+.dot--pulse {
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.banner {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 7px 10px;
+  border-radius: var(--radius-row);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.banner--info {
+  background: var(--fill);
+}
+
+.banner--error {
+  background: color-mix(in srgb, var(--red) 14%, transparent);
+}
+
+.banner--warn {
+  background: color-mix(in srgb, var(--orange) 16%, transparent);
+}
+
+/* Increase Contrast: stronger fills and separators, and a visible edge on push buttons and fields. */
+@media (prefers-contrast: more) {
+  :root {
+    --label-secondary: rgb(0 0 0 / 80%);
+    --label-tertiary: rgb(0 0 0 / 62%);
+    --separator: rgb(0 0 0 / 35%);
+    --fill: rgb(0 0 0 / 12%);
+    --fill-strong: rgb(0 0 0 / 20%);
+    --group-bg: #fff;
+    --control-fill: rgb(0 0 0 / 14%);
+    --control-fill-strong: rgb(0 0 0 / 28%);
+    --control-fill-check: rgb(0 0 0 / 20%);
+    --field-border: rgb(0 0 0 / 55%);
+  }
+
+  button:not([class]),
+  button.default,
+  button.destructive,
+  .popup-button,
+  .segmented {
+    border: 1px solid var(--field-border);
+  }
+
+  button.default {
+    border-color: transparent;
+  }
+
+  .field,
+  .search {
+    border-width: 1px;
+  }
+}
+
+@media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+  :root {
+    --label-secondary: rgb(255 255 255 / 85%);
+    --label-tertiary: rgb(255 255 255 / 66%);
+    --separator: rgb(255 255 255 / 40%);
+    --fill: rgb(255 255 255 / 16%);
+    --fill-strong: rgb(255 255 255 / 26%);
+    --group-bg: #1c1c1e;
+    --control-fill: rgb(255 255 255 / 20%);
+    --control-fill-strong: rgb(255 255 255 / 34%);
+    --control-fill-check: rgb(255 255 255 / 26%);
+    --field-border: rgb(255 255 255 / 60%);
+  }
+}
+
+/* Reduce Motion. */
+@media (prefers-reduced-motion: reduce) {
+  .dot--pulse {
+    animation: none;
+  }
+
+  input[type="checkbox"].toggle,
+  input[type="checkbox"].toggle::after {
+    transition: none;
+  }
+}
+
+/* Reduce Transparency: translucent surfaces become opaque. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --group-bg: #fff;
+    --field-bg: #fff;
+  }
+
+  .banner--error {
+    background: color-mix(in srgb, var(--red) 14%, var(--surface));
+  }
+
+  .banner--warn {
+    background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
+  :root {
+    --group-bg: #38383a;
+    --field-bg: #1c1c1e;
+  }
+}
+
+.error-boundary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  color: var(--label-secondary);
+}
+
+.error-boundary p {
+  margin: 0;
+}

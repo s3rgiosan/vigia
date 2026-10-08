@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <clipPath id="glass"><circle cx="512" cy="512" r="250"/></clipPath>
+  </defs>
+  <g clip-path="url(#glass)">
+    <rect x="262" y="262" width="500" height="300" fill="#4A6CB3"/>
+    <rect x="262" y="562" width="500" height="200" fill="#10234A"/>
+  </g>
+</svg>

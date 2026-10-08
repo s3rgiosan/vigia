@@ -1,0 +1,9 @@
+[alias]
+# Line coverage without the files that only wire up a running app (the Tauri builder, the
+# binary entry point, the Settings toolbar and the debug fixture loader). Run as `cargo cov`.
+cov = [
+    "llvm-cov",
+    "--summary-only",
+    "--ignore-filename-regex",
+    "(^|/)(main|lib|settings_toolbar|debug_setup)\\.rs$",
+]

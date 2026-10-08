@@ -1,0 +1,71 @@
+[package]
+name = "vigia"
+version = "1.0.0"
+description = "Menu bar CI status for GitHub Actions and GitLab CI"
+authors = ["Sérgio Santos"]
+license = "MIT"
+edition = "2021"
+rust-version = "1.94"
+publish = false
+
+[lib]
+name = "vigia_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Exposes test doubles such as `secrets::MemoryStore` to integration tests.
+test-support = []
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+globset = "0.4.20"
+time = { version = "0.3.55", features = ["parsing", "formatting", "macros", "serde"] }
+log = "0.4.34"
+tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "time", "sync"] }
+thiserror = "2.0.21"
+async-trait = "0.1.92"
+url = "2.5.8"
+reqwest = { version = "0.13.5", default-features = false, features = ["native-tls", "json", "gzip", "http2", "charset", "system-proxy"] }
+keyring = "4"
+uuid = { version = "1.27.0", features = ["v4"] }
+tauri-plugin-log = "2"
+rand = "0.10.3"
+tempfile = "3.27.0"
+tauri-plugin-positioner = { version = "2", features = ["tray-icon"] }
+tauri-plugin-notification = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-clipboard-manager = "2"
+# Native TLS like the rest of the app; macOS installs the .app.tar.gz without the zip feature.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
+tauri-plugin-process = "2"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
+
+[dev-dependencies]
+# The crate itself with test doubles enabled, for the integration tests.
+vigia = { path = ".", features = ["test-support"] }
+tokio = { version = "1.53.2", features = ["test-util"] }
+wiremock = "0.6.5"
+
+[lints.clippy]
+all = "deny"
+
+# AppKit access: the menu bar's appearance, the tray status badge, and the Settings toolbar.
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+# Already built for tauri-plugin-notification; used directly to learn when a notification is clicked.
+mac-notification-sys = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSThread", "NSObject", "NSSet", "NSData", "NSGeometry"] }
+objc2-app-kit = { version = "0.3", features = ["NSAppearance", "NSStatusItem", "NSStatusBarButton", "NSButton", "NSControl", "NSView", "NSResponder", "NSToolbar", "NSToolbarItem", "NSWindow", "NSImage", "NSImageView", "NSCell", "NSGraphics", "NSAccessibilityProtocols"] }

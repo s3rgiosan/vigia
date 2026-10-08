@@ -1,0 +1,20 @@
+.gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+  min-height: 100vh;
+  box-sizing: border-box;
+  background: var(--window-bg);
+}
+
+.gallery__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.gallery__row > span:first-child {
+  width: 96px;
+  color: var(--label-secondary);
+}

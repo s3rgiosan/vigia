@@ -1,0 +1,77 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Vigia",
+  "version": "1.0.0",
+  "identifier": "com.s3rgiosan.vigia",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "popup",
+        "title": "Vigia",
+        "url": "index.html?view=popup",
+        "width": 380,
+        "height": 520,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "transparent": true,
+        "shadow": true,
+        "windowEffects": {
+          "effects": [
+            "liquidGlassRegular",
+            "popover"
+          ],
+          "state": "active",
+          "radius": 18
+        }
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "copyright": "© 2026 Sérgio Santos",
+    "category": "public.app-category.developer-tools",
+    "shortDescription": "Menu bar CI status for GitHub Actions and GitLab CI",
+    "longDescription": "Menu bar CI status for GitHub Actions and GitLab CI",
+    "resources": {
+      "../THIRD-PARTY-LICENSES.md": "THIRD-PARTY-LICENSES.md"
+    },
+    "targets": [
+      "dmg"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-",
+      "files": {
+        "Resources/Assets.car": "./icons/Assets.car"
+      }
+    },
+    "createUpdaterArtifacts": false
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDg1RDRENTE1NjVGMDUwMUUKUldRZVVQQmxGZFhVaFZXcUNLbG9kTjF5OWRjTmFKSFNRa0Z1bDl4U1lYYlJ3WnA3SnU3Tng5NEUK",
+      "endpoints": [
+        "https://github.com/s3rgiosan/vigia/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

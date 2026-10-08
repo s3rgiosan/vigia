@@ -1,0 +1,24 @@
+## Rust crates
+
+{{#each overview}}
+- {{{name}}} ({{count}})
+{{/each}}
+
+{{#each licenses}}
+### {{{name}}}
+
+Used by:
+
+{{#each used_by}}
+- {{crate.name}} {{crate.version}}
+{{/each}}
+
+<details><summary>Licence text</summary>
+
+```text
+{{{text}}}
+```
+
+</details>
+
+{{/each}}
