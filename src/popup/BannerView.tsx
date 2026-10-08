@@ -1,4 +1,5 @@
 import { Icon } from "../components/Icon";
+import { authReason } from "../lib/auth";
 import { bannerMessage, type Banner } from "../lib/grouping";
 import type { SettingsTarget } from "../lib/tauri";
 
@@ -22,7 +23,8 @@ export function BannerView({
           </button>
         </div>
       );
-    case "auth":
+    case "auth": {
+      const keychain = authReason(banner.account) === "keychain";
       return (
         <div className="banner banner--error" role="alert">
           <Icon name="warning" size={14} />
@@ -30,12 +32,17 @@ export function BannerView({
           <button
             type="button"
             className="banner__action"
-            onClick={() => onOpenSettings({ pane: "accounts", sheet: "replace", accountId: banner.account.id })}
+            onClick={() =>
+              onOpenSettings(
+                keychain ? { pane: "accounts" } : { pane: "accounts", sheet: "replace", accountId: banner.account.id },
+              )
+            }
           >
-            Replace Token…
+            {keychain ? "Open Settings" : "Replace Token…"}
           </button>
         </div>
       );
+    }
     case "config_error":
       return (
         <div className="banner banner--warn" role="status" title={banner.message}>

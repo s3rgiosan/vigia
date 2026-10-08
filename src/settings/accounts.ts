@@ -1,3 +1,4 @@
+import { authReason, authStatusText } from "../lib/auth";
 import type { AccountKind, AccountSnapshot } from "../lib/snapshot";
 import type { Account } from "../lib/tauri";
 
@@ -15,7 +16,7 @@ export function accountStatus(status: AccountSnapshot | undefined): AccountStatu
     return { color: "gray", text: "Checking…" };
   }
   if (status.auth_error) {
-    return { color: "red", text: status.keychain_denied ? "Can’t read Keychain" : "Token rejected" };
+    return { color: "red", text: authStatusText(authReason(status)) };
   }
   if (status.unreachable) {
     return { color: "orange", text: "Unreachable" };

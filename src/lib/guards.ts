@@ -15,8 +15,15 @@ function isRepoInfo(value: unknown): boolean {
   return isObject(value) && typeof value.id === "number" && typeof value.full_name === "string";
 }
 
+const AUTH_REASONS: readonly unknown[] = ["rejected", "missing_token", "keychain"];
+
 function isAccountSnapshot(value: unknown): boolean {
-  return isObject(value) && typeof value.id === "string" && typeof value.label === "string";
+  return (
+    isObject(value) &&
+    typeof value.id === "string" &&
+    typeof value.label === "string" &&
+    (value.auth_reason === undefined || value.auth_reason === null || AUTH_REASONS.includes(value.auth_reason))
+  );
 }
 
 function isRepoSnapshot(value: unknown): boolean {

@@ -1,3 +1,4 @@
+import { authPopupMessage, authReason } from "./auth";
 import type { AccountSnapshot, RepoSnapshot, RepoStatus, Run, RunState, Snapshot, TrayColor } from "./snapshot";
 
 export type SectionId = "failed" | "error" | "running" | "passing" | "none";
@@ -51,6 +52,7 @@ export function buildSections(snapshot: Snapshot, filter: string): Section[] {
     label: "Unknown account",
     kind: "github",
     auth_error: false,
+    auth_reason: null,
     unreachable: false,
     rate_limited_until: null,
     effective_interval_secs: 0,
@@ -128,7 +130,11 @@ export function buildBanners(snapshot: Snapshot, nowUnix: number): Banner[] {
   }
   for (const account of snapshot.accounts) {
     if (account.auth_error) {
-      banners.push({ kind: "auth", account });
+      // The Keychain banner already covers accounts whose token is unreadable.
+      const coveredByKeychainBanner = snapshot.secrets_blocked && authReason(account) === "keychain";
+      if (!coveredByKeychainBanner) {
+        banners.push({ kind: "auth", account });
+      }
     } else if (account.unreachable) {
       banners.push({ kind: "unreachable", account });
     } else if (account.rate_limited_until !== null && account.rate_limited_until > nowUnix) {
@@ -257,7 +263,7 @@ export function bannerMessage(banner: Banner): string {
     case "config_read_only":
       return "Settings were saved by a newer version of Vigia. Update Vigia to change them.";
     case "auth":
-      return `The token for “${banner.account.label}” was rejected.`;
+      return authPopupMessage(authReason(banner.account), banner.account.label);
     case "unreachable":
       return `${banner.account.label} is unreachable. Showing the last known state.`;
     case "rate_limited": {

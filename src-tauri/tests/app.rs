@@ -21,7 +21,7 @@ use vigia_lib::config::{
 use vigia_lib::model::{RepoStatus, Run, RunState};
 use vigia_lib::notes;
 use vigia_lib::notify::{ClickTarget, Notification};
-use vigia_lib::poller::Snapshot;
+use vigia_lib::poller::{AuthReason, Snapshot};
 use vigia_lib::providers::{
     AccountIdentity, FetchOutcome, FetchRequest, Provider, ProviderError, RepoCache, RepoInfo,
 };
@@ -429,6 +429,7 @@ async fn account_without_token_shows_every_repo_in_error() {
     let snapshot = h.runtime.snapshot();
     let account = &snapshot.accounts[0];
     assert!(account.auth_error);
+    assert_eq!(account.auth_reason, Some(AuthReason::MissingToken));
     assert!(!account.keychain_denied);
     assert_eq!(account.error.as_deref(), Some(notes::NO_TOKEN));
     assert_eq!(snapshot.repos.len(), 2);
@@ -453,6 +454,7 @@ async fn blocked_keychain_marks_accounts_as_denied() {
     assert!(snapshot.secrets_blocked);
     let account = &snapshot.accounts[0];
     assert!(account.keychain_denied);
+    assert_eq!(account.auth_reason, Some(AuthReason::Keychain));
     assert_eq!(account.error.as_deref(), Some(notes::KEYCHAIN_DENIED));
     assert_eq!(
         snapshot.repos[0].state.note.as_deref(),

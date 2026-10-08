@@ -222,13 +222,21 @@ describe("connection status", () => {
   const cases: { name: string; snapshot: Partial<AccountSnapshot> | null; color: string; text: string; banner: string | null }[] = [
     { name: "unchecked", snapshot: null, color: "gray", text: "Checking…", banner: null },
     { name: "connected", snapshot: {}, color: "green", text: "Connected", banner: null },
-    { name: "token rejected", snapshot: { auth_error: true }, color: "red", text: "Token rejected", banner: "The token was rejected" },
+    { name: "token rejected", snapshot: { auth_error: true, auth_reason: "rejected" }, color: "red", text: "Token rejected", banner: "The token was rejected" },
+    { name: "token rejected without a reason", snapshot: { auth_error: true }, color: "red", text: "Token rejected", banner: "The token was rejected" },
+    {
+      name: "missing its token",
+      snapshot: { auth_error: true, auth_reason: "missing_token" },
+      color: "red",
+      text: "No token saved",
+      banner: "No token is saved for this account",
+    },
     {
       name: "unable to read the Keychain",
-      snapshot: { auth_error: true, keychain_denied: true },
+      snapshot: { auth_error: true, auth_reason: "keychain", keychain_denied: true },
       color: "red",
       text: "Can’t read Keychain",
-      banner: "The token was rejected",
+      banner: "Vigia can’t read its tokens from the Keychain",
     },
     { name: "unreachable", snapshot: { unreachable: true }, color: "orange", text: "Unreachable", banner: "The server is unreachable" },
     { name: "rate limited", snapshot: { rate_limited_until: 100 }, color: "orange", text: "Rate limited", banner: null },
@@ -245,6 +253,16 @@ describe("connection status", () => {
       expect(Boolean(banner)).toBe(Boolean(c.banner));
     });
   }
+});
+
+describe("Keychain banner", () => {
+  it("is the only Keychain banner when the Keychain is blocked", () => {
+    mount(makeView({ accounts: [github], repos: [], secrets_blocked: true }), [
+      status("a1", { auth_error: true, auth_reason: "keychain", keychain_denied: true }),
+    ]);
+    expect(screen.queryByText(/can’t read its tokens/)).toBeNull();
+    expect(screen.getAllByText("Can’t read Keychain")).toHaveLength(2);
+  });
 });
 
 describe("renaming", () => {

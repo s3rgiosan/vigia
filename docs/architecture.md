@@ -254,7 +254,7 @@ Files: `poller.rs` (per-account cycle, scheduling), `pool.rs` (rate budget), `ap
 
 ### Tasks and pools
 
-`Runtime::restart` runs at launch and after any config change. It starts one task per configured account. An account whose token is missing or unreadable is shown as an auth error with every repo in Error and gets no task. A restart bumps a generation counter, and a worker from an older generation neither publishes nor notifies.
+`Runtime::restart` runs at launch and after any config change. It starts one task per configured account. An account whose token is missing or unreadable is shown as an auth error (`auth_reason` `missing_token`, or `keychain` while the Keychain is blocked) with every repo in Error and gets no task. A 401 from the provider sets `auth_reason` `rejected`. A restart bumps a generation counter, and a worker from an older generation neither publishes nor notifies.
 
 An account whose kind, base URL and token are unchanged keeps its poll state. The token is compared by hash, so it is never stored for the comparison. The new worker adopts the old one's repo states, caches, schedule and failure counts (`AccountWorker::adopt`), together with its reachability, backoff and rate limit state unless the token was rejected. A worker parked between cycles is taken over at once. A worker in the middle of a cycle finishes it and hands itself to its successor; the successor shows the last published states meanwhile. Only repos whose selection changed drop their cached runs and become due at once: a change of effective branch patterns, ignored workflows or tag choice (from the repo, organization or global setting), pull request exclusion or default branch (`selection_changed` in `filters.rs`). Changing an organization's filters therefore refetches only that organization's repos whose effective values changed, across every account that watches them, and `Notifier::apply_config` resets the baseline of the same repos. Workflow and tag lists stay cached. A changed poll interval brings later due times forward. A replaced token starts fresh.
 
@@ -340,7 +340,7 @@ At launch, each account's first cycle polls its repos before anything else. Afte
 
 ### Snapshot and publishing
 
-`SnapshotStore` holds account and repo states. A `Snapshot` has the generation time, `paused`, `secrets_blocked`, `config_read_only`, `config_error`, `update` (`{ version, notes }` of a newer release found by an update check, or `null`), the tray color and tooltip, accounts (auth error, unreachable, rate-limited-until, configured and effective interval, Keychain denial, error text) and repos sorted by name. After every cycle the runtime stores the results of the repos the cycle touched and asks to publish.
+`SnapshotStore` holds account and repo states. A `Snapshot` has the generation time, `paused`, `secrets_blocked`, `config_read_only`, `config_error`, `update` (`{ version, notes }` of a newer release found by an update check, or `null`), the tray color and tooltip, accounts (auth error, `auth_reason` (`rejected`, `missing_token`, `keychain` or `null`), unreachable, rate-limited-until, configured and effective interval, Keychain denial, error text) and repos sorted by name. After every cycle the runtime stores the results of the repos the cycle touched and asks to publish.
 
 A publish updates the tray and emits `snapshot-updated`. It happens only when the stored states, the pause flag, the app flags or the found update changed; the generation time alone is not a change. Publishes requested by workers are at most 1 s apart across all accounts (`PUBLISH_INTERVAL`); a change inside that window is published when it ends. Restarts and pause toggles publish at once.
 
@@ -478,6 +478,10 @@ Structure, top to bottom:
 | Config unreadable | "Vigia couldn’t read its settings file, so changes won’t be saved." | none |
 | Config from a newer version | "Settings were saved by a newer version of Vigia. Update Vigia to change them." | none |
 | Token rejected | "The token for “<account>” was rejected." | **Replace Token…**, which opens Settings on the Replace Token sheet for that account |
+| No token saved | "No token is saved for “<account>”." | **Replace Token…** |
+| Account token unreadable | "Vigia can’t read the token for “<account>” from the Keychain." | **Open Settings** |
+
+The account banners and the Settings status text follow the snapshot's `auth_reason` (`lib/auth.ts`); a missing or unknown reason reads as a rejected token.
 | Account unreachable | "<account> is unreachable. Showing the last known state." | none |
 | Rate-limit pause | "<account>: paused until <time> to stay within the GitHub API limit." (GitLab for a GitLab account) | none |
 - Sections: Failed, Errors and Running start expanded; Passing and No runs start collapsed. Within a section, repos are grouped by account (when there is more than one) and then by owner or namespace.

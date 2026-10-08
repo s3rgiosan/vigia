@@ -12,8 +12,8 @@ use vigia_lib::filters::FilterCompiler;
 use vigia_lib::http::RateLimit;
 use vigia_lib::model::{RepoStatus, Run, RunState};
 use vigia_lib::poller::{
-    due_after, poll_repo, repo_backoff_secs, AccountWorker, RepoRuntime, BACKOFF_MAX_SECS,
-    DUE_BUCKET_SECS, FAILURES_BEFORE_ERROR,
+    due_after, poll_repo, repo_backoff_secs, AccountWorker, AuthReason, RepoRuntime,
+    BACKOFF_MAX_SECS, DUE_BUCKET_SECS, FAILURES_BEFORE_ERROR,
 };
 use vigia_lib::pool::FAST_POLL_SECS;
 use vigia_lib::pool::{PoolKind, PoolState, RequestClass};
@@ -306,6 +306,7 @@ async fn unauthorized_marks_account_and_stops_polling() {
     let mut w = worker(AccountKind::GitHub, provider.clone(), 2);
     w.cycle(NOW, false, false).await;
     assert!(w.status.auth_error);
+    assert_eq!(w.status.auth_reason, Some(AuthReason::Rejected));
     assert!(w.repos.iter().all(|r| r.state.status == RepoStatus::Error));
     assert_eq!(
         w.status.error.as_deref(),
@@ -1530,4 +1531,20 @@ async fn a_cached_membership_answer_counts_no_request() {
     )
     .await;
     assert_eq!(result.counted, 2);
+}
+
+#[test]
+fn auth_reason_serializes_as_snake_case_or_null() {
+    use vigia_lib::poller::AccountSnapshot;
+    let json = |reason| {
+        let account = AccountSnapshot {
+            auth_reason: reason,
+            ..Default::default()
+        };
+        serde_json::to_value(account).unwrap()["auth_reason"].clone()
+    };
+    assert_eq!(json(None), serde_json::Value::Null);
+    assert_eq!(json(Some(AuthReason::Rejected)), "rejected");
+    assert_eq!(json(Some(AuthReason::MissingToken)), "missing_token");
+    assert_eq!(json(Some(AuthReason::Keychain)), "keychain");
 }

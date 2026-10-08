@@ -9,6 +9,7 @@ export function makeAccount(overrides: Partial<AccountSnapshot> = {}): AccountSn
     label: "Acme",
     kind: "github",
     auth_error: false,
+    auth_reason: null,
     unreachable: false,
     rate_limited_until: null,
     effective_interval_secs: 60,

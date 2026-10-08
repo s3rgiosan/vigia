@@ -341,6 +341,27 @@ describe("Popup banners", () => {
     expect(screen.getByRole("alert").textContent).toContain("The token for “Acme” was rejected.");
   });
 
+  it("shows a missing-token banner that opens the replace-token sheet", async () => {
+    await mount(snapshot({ accounts: [account({ auth_error: true, auth_reason: "missing_token" })] }));
+    expect(screen.getByRole("alert").textContent).toContain("No token is saved for “Acme”.");
+    fireEvent.click(screen.getByRole("button", { name: "Replace Token…" }));
+    expect(openSettings).toHaveBeenCalledWith({ pane: "accounts", sheet: "replace", accountId: "acc-1" });
+  });
+
+  it("shows a Keychain banner that opens Settings", async () => {
+    await mount(snapshot({ accounts: [account({ auth_error: true, auth_reason: "keychain", keychain_denied: true })] }));
+    expect(screen.getByRole("alert").textContent).toContain("Vigia can’t read the token for “Acme” from the Keychain.");
+    fireEvent.click(screen.getByRole("button", { name: "Open Settings" }));
+    expect(openSettings).toHaveBeenCalledWith({ pane: "accounts" });
+  });
+
+  it("shows one banner when the Keychain is blocked", async () => {
+    await mount(
+      snapshot({ secrets_blocked: true, accounts: [account({ auth_error: true, auth_reason: "keychain", keychain_denied: true })] }),
+    );
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+  });
+
   it("opens the replace-token sheet from the rejected-token banner", async () => {
     await mount(snapshot({ accounts: [account({ auth_error: true })] }));
     fireEvent.click(screen.getByRole("button", { name: "Replace Token…" }));

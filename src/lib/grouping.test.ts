@@ -121,6 +121,17 @@ describe("buildBanners", () => {
     ]);
   });
 
+  it("words an auth banner by the account's reason", () => {
+    const s = snapshot([account("a", "Auth", { auth_error: true, auth_reason: "missing_token" })], []);
+    expect(bannerMessage(buildBanners(s, 0)[0])).toBe("No token is saved for “Auth”.");
+  });
+
+  it("leaves a Keychain-caused auth error to the Keychain banner while it is shown", () => {
+    const a = account("a", "Auth", { auth_error: true, auth_reason: "keychain" });
+    expect(buildBanners({ ...snapshot([a], []), secrets_blocked: true }, 0).map((b) => b.kind)).toEqual(["secrets_blocked"]);
+    expect(buildBanners(snapshot([a], []), 0).map((b) => b.kind)).toEqual(["auth"]);
+  });
+
   it("puts app-level banners first", () => {
     const s = { ...snapshot([account("a", "Auth", { auth_error: true })], []), secrets_blocked: true, config_read_only: true };
     expect(buildBanners(s, 0).map((b) => b.kind)).toEqual(["secrets_blocked", "config_read_only", "auth"]);

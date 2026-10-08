@@ -3,6 +3,7 @@ import { FormRow, FormSection } from "../components/Form";
 import { Icon } from "../components/Icon";
 import { ActionPopUpButton } from "../components/PopUpButton";
 import { Sheet } from "../components/Sheet";
+import { authReason, authSettingsMessage } from "../lib/auth";
 import { friendlyError } from "../lib/errors";
 import { useLatest } from "../lib/hooks/useLatest";
 import { useRovingListbox } from "../lib/hooks/useRovingListbox";
@@ -269,6 +270,8 @@ function AccountDetail({
   }, [latest]);
 
   const { text } = accountStatus(status);
+  // The pane-level Keychain banner already covers an account whose token is unreadable.
+  const keychainBannerCovers = secretsBlocked && status !== undefined && authReason(status) === "keychain";
 
   return (
     <div className="accounts__detail">
@@ -284,10 +287,10 @@ function AccountDetail({
         </div>
       </div>
 
-      {status?.auth_error ? (
+      {status?.auth_error && !keychainBannerCovers ? (
         <div className="banner banner--error">
           <Icon name="warning" size={14} />
-          <span className="grow">The token was rejected. Replace it to resume checking.</span>
+          <span className="grow">{authSettingsMessage(authReason(status))}</span>
         </div>
       ) : null}
       {status?.unreachable ? (

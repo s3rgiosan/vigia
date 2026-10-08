@@ -19,7 +19,7 @@ use tokio::task::JoinHandle;
 use crate::config::{Account, AccountKind, Config, ConfigError, ConfigStore};
 use crate::notify::{filter_transitions, render, Notification, Notifier};
 use crate::poller::{
-    base_interval_secs, is_wake_gap, AccountWorker, Controls, Snapshot, SnapshotFlags,
+    base_interval_secs, is_wake_gap, AccountWorker, AuthReason, Controls, Snapshot, SnapshotFlags,
     SnapshotStore, HEARTBEAT_SECS,
 };
 use crate::pool::{PoolKind, PoolState, RequestClass};
@@ -508,10 +508,10 @@ impl Runtime {
         now: OffsetDateTime,
     ) {
         let keychain_denied = self.secrets.is_blocked();
-        let note = if keychain_denied {
-            crate::notes::KEYCHAIN_DENIED
+        let (note, reason) = if keychain_denied {
+            (crate::notes::KEYCHAIN_DENIED, AuthReason::Keychain)
         } else {
-            crate::notes::NO_TOKEN
+            (crate::notes::NO_TOKEN, AuthReason::MissingToken)
         };
         let interval = base_interval_secs(&config.settings);
         let status = crate::poller::AccountSnapshot {
@@ -519,6 +519,7 @@ impl Runtime {
             label: account.label.clone(),
             kind: account.kind,
             auth_error: true,
+            auth_reason: Some(reason),
             effective_interval_secs: interval,
             configured_interval_secs: interval,
             keychain_denied,

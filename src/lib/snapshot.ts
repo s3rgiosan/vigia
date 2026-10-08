@@ -35,11 +35,16 @@ export interface RepoState {
   note: string | null;
 }
 
+/** Why an account is in an auth error. */
+export type AuthReason = "rejected" | "missing_token" | "keychain";
+
 export interface AccountSnapshot {
   id: string;
   label: string;
   kind: AccountKind;
   auth_error: boolean;
+  /** The cause of `auth_error`; null without one. */
+  auth_reason: AuthReason | null;
   unreachable: boolean;
   rate_limited_until: number | null;
   effective_interval_secs: number;

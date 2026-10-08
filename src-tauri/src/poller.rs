@@ -65,12 +65,26 @@ pub fn is_wake_gap(gap: Duration) -> bool {
     gap > Duration::seconds(WAKE_GAP_SECS)
 }
 
+/// Why an account is in an auth error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthReason {
+    /// The provider answered 401.
+    Rejected,
+    /// No token is saved for the account.
+    MissingToken,
+    /// The Keychain could not be read.
+    Keychain,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AccountSnapshot {
     pub id: String,
     pub label: String,
     pub kind: AccountKind,
     pub auth_error: bool,
+    /// The cause of `auth_error`; `None` while the account has no auth error.
+    pub auth_reason: Option<AuthReason>,
     pub unreachable: bool,
     /// Unix time until which the pool is rate limited.
     pub rate_limited_until: Option<i64>,
@@ -981,6 +995,7 @@ impl AccountWorker {
         match account_error {
             Some(ProviderError::Unauthorized) => {
                 self.status.auth_error = true;
+                self.status.auth_reason = Some(AuthReason::Rejected);
                 self.status.error = Some(notes::TOKEN_REJECTED.into());
                 for r in &mut self.repos {
                     r.state = error_state(r.state.clone(), notes::TOKEN_REJECTED);

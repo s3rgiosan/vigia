@@ -21,6 +21,18 @@ describe("isSnapshot", () => {
     expect(isSnapshot(snapshot)).toBe(true);
   });
 
+  it("accepts an account with a known auth reason, a null one or none", () => {
+    for (const auth_reason of ["rejected", "missing_token", "keychain", null] as const) {
+      expect(isSnapshot(makeSnapshot({ accounts: [makeAccount({ auth_reason })] }))).toBe(true);
+    }
+    const { auth_reason: _omitted, ...legacy } = makeAccount();
+    expect(isSnapshot({ ...makeSnapshot(), accounts: [legacy] })).toBe(true);
+  });
+
+  it("rejects an account with an unknown auth reason", () => {
+    expect(isSnapshot({ ...makeSnapshot(), accounts: [{ ...makeAccount(), auth_reason: "expired" }] })).toBe(false);
+  });
+
   it("accepts an available update with or without notes", () => {
     expect(isSnapshot(makeSnapshot({ update: { version: "2.0.0", notes: "Fixes." } }))).toBe(true);
     expect(isSnapshot(makeSnapshot({ update: { version: "2.0.0", notes: null } }))).toBe(true);

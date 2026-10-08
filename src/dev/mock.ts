@@ -4,7 +4,7 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
 import { NO_ACCESS_NOTE } from "../lib/github";
-import type { RepoSnapshot, RepoStatus, Run, RunState, Snapshot, UpdateInfo } from "../lib/snapshot";
+import type { AuthReason, RepoSnapshot, RepoStatus, Run, RunState, Snapshot, UpdateInfo } from "../lib/snapshot";
 import type { OrgFilters, PickerRepo, SettingsView, WatchedRepo } from "../lib/tauri";
 
 const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
@@ -72,6 +72,21 @@ function organizations(repos: WatchedRepo[], filters: Map<string, OrgFilters>): 
 
 const AVAILABLE_UPDATE: UpdateInfo = { version: "1.1.0", notes: "Fabricated release notes." };
 
+/** The auth problem a scenario shows on an account, if any. */
+function authReasonFor(scenario: string, accountId: string): AuthReason | null {
+  if (accountId !== "gh-home") {
+    return null;
+  }
+  switch (scenario) {
+    case "banners":
+      return "rejected";
+    case "missing_token":
+      return "missing_token";
+    default:
+      return null;
+  }
+}
+
 function buildSnapshot(paused: boolean, scenario: string): Snapshot {
   const repos: RepoSnapshot[] = [
     repo("gh-work", "acme/billing-api", "failed", [
@@ -97,7 +112,8 @@ function buildSnapshot(paused: boolean, scenario: string): Snapshot {
     id: a.id,
     label: a.label,
     kind: a.kind,
-    auth_error: scenario === "banners" && a.id === "gh-home",
+    auth_error: authReasonFor(scenario, a.id) !== null,
+    auth_reason: authReasonFor(scenario, a.id),
     unreachable: scenario === "banners" && a.id === "gl-corp",
     rate_limited_until: null,
     effective_interval_secs: a.id === "gh-work" ? 144 : 60,
