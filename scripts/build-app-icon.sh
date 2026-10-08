@@ -7,7 +7,7 @@
 #   target of 26, so it is compiled here; the bundle copies it in (bundle.macOS.files) and
 #   Info.plist names it (CFBundleIconName);
 # - exports a flat 1024 px render for older macOS versions and for `tauri dev`, then generates
-#   the .icns and PNG sizes from it.
+#   the .icns, .ico and PNG sizes from it.
 # Requires Xcode 26 or later. Run from the repo root and commit the results.
 set -eu
 
@@ -33,6 +33,6 @@ rm -rf "$OUT"
 
 npx tauri icon "$ICONS/app-icon.png"
 
-# Vigia ships for macOS only.
+# Vigia ships for macOS, Linux and Windows; the mobile and Microsoft Store sizes go.
 rm -rf "$ICONS/android" "$ICONS/ios" "$ICONS"/Square*.png "$ICONS/StoreLogo.png" \
-  "$ICONS/icon.ico" "$ICONS/64x64.png" "$ICONS/icon.png" "$ICONS/app-icon.png"
+  "$ICONS/64x64.png" "$ICONS/icon.png" "$ICONS/app-icon.png"

@@ -27,6 +27,14 @@
   }
 }
 
+/* Linux and Windows show the popup in an opaque, square window. */
+.popup.popup--opaque {
+  border-radius: 0;
+  background: var(--window-bg);
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
 /* Header ------------------------------------------------------------------ */
 
 .popup__header {

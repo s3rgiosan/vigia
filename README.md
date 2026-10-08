@@ -1,14 +1,18 @@
 # Vigia
 
-Vigia is a macOS menu bar app that shows the state of CI runs across many repositories. It reads GitHub Actions on github.com and GitLab CI on gitlab.com or self-managed instances.
+Vigia is a menu bar app for macOS, and a tray app for Linux and Windows, that shows the state of CI runs across many repositories. It reads GitHub Actions on github.com and GitLab CI on gitlab.com or self-managed instances.
 
 The menu bar icon is a porthole. It has no badge when idle or paused, and a coloured badge with a glyph for the worst state across every watched repository: red × for a failure, orange ! when something could not be checked, yellow ••• while runs are in progress, green ✓ when everything passes. The popup lists each repository with its latest run and opens it in the browser.
 
 ## Requirements
 
-macOS 10.15 or later. The popup uses Liquid Glass on macOS 26 and a popover material on earlier versions.
+- macOS 10.15 or later. The popup uses Liquid Glass on macOS 26 and a popover material on earlier versions.
+- Linux on x86_64 with glibc 2.35 or later (Ubuntu 22.04, Debian 12, Fedora 36 and newer), WebKitGTK 4.1, a panel that shows tray icons, and a Secret Service keyring such as GNOME Keyring or KWallet. GNOME shows tray icons only with the AppIndicator extension (preinstalled on Ubuntu).
+- Windows 10 or 11 on x86_64. The installer adds WebView2 when it is missing.
 
 ## Install
+
+### macOS
 
 1. Download the `.dmg` from the latest release and drag Vigia to Applications.
 2. The build is ad-hoc signed, not notarized. macOS blocks the first launch:
@@ -18,11 +22,26 @@ macOS 10.15 or later. The popup uses Liquid Glass on macOS 26 and a popover mate
 
 After each update, macOS asks once for the login keychain password, because each ad-hoc signed build has a new code identity that the Keychain item's access list does not match. Enter the password and choose **Always Allow**.
 
+### Linux
+
+Download the `.AppImage` or the `.deb` from the latest release.
+
+- AppImage: `chmod +x Vigia_*.AppImage`, then run it. The AppImage updates itself in place.
+- deb: `sudo apt install ./Vigia_*.deb`. Updates install through the package manager and ask for your password.
+
+The tray icon has no click action on Linux: click it to open its menu, then choose **Open Vigia**.
+
+### Windows
+
+1. Download `Vigia_*_x64-setup.exe` from the latest release and run it. It installs for the current user and needs no administrator rights.
+2. The installer is not code signed, so SmartScreen warns on the first run: choose **More info**, then **Run anyway**.
+3. Windows can hide new tray icons in the overflow menu. Drag the porthole onto the taskbar to keep it visible.
+
 ## Setup
 
-1. Click the porthole, then **Add Account…**.
+1. Click the porthole (on Linux, choose **Open Vigia** in its menu), then **Add Account…**.
 2. GitHub: Vigia accepts fine-grained tokens only (they start with `github_pat_`). Click **Create Token on GitHub** in the form: it opens GitHub with the name, a 90-day expiry, and the two permissions filled in (Actions: Read-only, Metadata: Read-only). Enter the owner in **Organization** first if the repos belong to one. Choose the repository access on GitHub, generate the token, and paste it back. One token covers one owner; add one account per owner. Organizations that enforce SAML single sign-on need the token authorized for SSO, or their repositories will not appear.
-   GitLab: enter the server URL and a personal access token with the `read_api` scope. Servers with an internal certificate authority work when it is trusted in the macOS Keychain. A server URL starting with `http://` needs the consent checkbox "This server uses http://. Send the token unencrypted anyway."
+   GitLab: enter the server URL and a personal access token with the `read_api` scope. Servers with an internal certificate authority work when the system trusts it: in the macOS Keychain, the Windows certificate store, or the system certificate store on Linux. A server URL starting with `http://` needs the consent checkbox "This server uses http://. Send the token unencrypted anyway."
 3. Use **Test Connection** to check the token, then **Add Account**.
 4. Pick repos in the Repositories pane. Each org has a select-all checkbox.
 5. Optional: set branch globs such as `release/*` in the Filters pane. The default watches each repo's default branch.
@@ -55,7 +74,7 @@ Example: All Repositories ignores `Dependabot*`, but one organization wants to s
 
 The General pane has two switches: **When a branch fails** and **When it recovers**. **When it recovers** is disabled while failure notifications are off. While macOS has no answer recorded, it asks for notification permission when you add an account or turn on a notification switch. Allow it in the prompt, or later under System Settings, Notifications.
 
-Clicking a notification for a single repository opens its run. A summary notification (more than three failures in one poll) and a token-rejected notification open the popup.
+On macOS, clicking a notification for a single repository opens its run. A summary notification (more than three failures in one poll) and a token-rejected notification open the popup. Linux and Windows show the same notifications without a click action.
 
 ## Known limits
 
@@ -65,23 +84,27 @@ Clicking a notification for a single repository opens its run. A summary notific
 - Tag runs are detected from the repository's tag list on GitHub and GitLab, refreshed when a run's ref is not the default branch, a known tag or an already checked ref. A branch named like a tag counts as that tag. Vigia reads at most 10 pages of a repository's tag list.
 - GitLab pipelines without a name are matched by their source, such as `schedule` or `web`.
 - An archived repository keeps its last state until you stop watching it.
+- Linux and Windows draw the tray icon in white for a dark panel or taskbar; on a light taskbar it has less contrast.
+- On a Wayland session the compositor chooses where the popup opens. Start Vigia with `GDK_BACKEND=x11` to place it in the top-right corner instead.
 
 ## Privacy
 
-No telemetry. Vigia contacts only the hosts of the accounts you add. Tokens live in the macOS Keychain and never leave the machine except in requests to those hosts. Logs never quote tokens or Keychain contents.
+No telemetry. Vigia contacts only the hosts of the accounts you add. Tokens live in the system credential store (the Keychain on macOS, Credential Manager on Windows, the Secret Service keyring on Linux) and never leave the machine except in requests to those hosts. Logs never quote tokens or credential store contents.
 
 ## Troubleshooting
 
-- "Vigia can’t read its tokens from the Keychain." Allow access, then choose **Try Again**. **Reset Keychain Item…** deletes all stored tokens; each account then needs its token entered again with **Replace Token…**.
+- "Vigia can’t read its tokens from the Keychain." Allow access, then choose **Try Again**. **Reset Keychain Item…** deletes all stored tokens; each account then needs its token entered again with **Replace Token…**. Windows names Credential Manager here, and Linux the keyring; on Linux, check that the keyring service is running and unlocked.
 - "Vigia couldn’t read its settings file, so changes won’t be saved." appears when Vigia cannot read its settings file. Fix the file's permissions or delete it, then reopen Vigia.
 - "The token for “<account>” was rejected." Choose **Replace Token…** in the banner and enter a new token.
 - A repository is Failed by a Dependabot run: add `Dependabot*` to Ignored workflows in the Filters pane, or fix Dependabot's access to the repository.
 - A workflow that runs on tags (such as a Release) is missing: turn on **Tag runs** in the Filters pane.
 - Polling slows down on its own when steady polling would use more than 40 percent of the API rate limit; the popup footer ends with "slowed to every …". A GitLab server that sends no rate limit headers is never slowed this way.
-- Logs are written to `~/Library/Logs/com.s3rgiosan.vigia/Vigia.log`.
-- Settings live in `~/Library/Application Support/com.s3rgiosan.vigia/config.json`. A file that is not valid JSON is moved aside as `config.json.corrupt-<timestamp>` and replaced by defaults.
+- Logs are written to `Vigia.log` in `~/Library/Logs/com.s3rgiosan.vigia/` on macOS, `~/.local/share/com.s3rgiosan.vigia/logs/` on Linux and `%LOCALAPPDATA%\com.s3rgiosan.vigia\logs\` on Windows.
+- Settings live in `config.json` in `~/Library/Application Support/com.s3rgiosan.vigia/` on macOS, `~/.config/com.s3rgiosan.vigia/` on Linux and `%APPDATA%\com.s3rgiosan.vigia\` on Windows. A file that is not valid JSON is moved aside as `config.json.corrupt-<timestamp>` and replaced by defaults.
 
 ## Uninstall
+
+On Linux and Windows, choose **Remove All Accounts…** in Settings, turn off **Open at login**, quit Vigia, then uninstall it (delete the AppImage, `sudo apt remove vigia`, or **Settings > Apps** on Windows) and delete the settings and log folders listed under Troubleshooting. On macOS:
 
 1. Optional: choose **Remove All Accounts…** in Settings to delete the stored tokens, or run `security delete-generic-password -s com.s3rgiosan.vigia -a tokens` afterwards.
 2. Turn off **Open at login** in the General pane, or delete `~/Library/LaunchAgents/Vigia.plist` after quitting.
@@ -91,7 +114,7 @@ No telemetry. Vigia contacts only the hosts of the accounts you add. Tokens live
 
 ## Licences
 
-Vigia is MIT licensed; see `LICENSE`. Third-party notices are in `THIRD-PARTY-LICENSES.md`. The icons use SF Symbols that are generated on the build machine from macOS and are not distributed in this repository.
+Vigia is MIT licensed; see `LICENSE`. Third-party notices are in `THIRD-PARTY-LICENSES.md`. On macOS the icons use SF Symbols, generated on the build machine from macOS and not distributed in this repository. Linux and Windows builds use [Lucide](https://lucide.dev) icons (ISC).
 
 ## Contributing
 

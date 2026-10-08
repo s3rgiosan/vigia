@@ -8,6 +8,9 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(() => ({
   plugins: [react()],
 
+  // TAURI_ENV_PLATFORM tells the frontend which OS the Tauri CLI builds for.
+  envPrefix: ["VITE_", "TAURI_ENV_"],
+
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
     coverage: {

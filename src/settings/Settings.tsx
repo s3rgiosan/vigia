@@ -28,6 +28,7 @@ import { ReposTab } from "./ReposTab";
 import { SettingsContext, type SettingsContextValue, type SheetRequest } from "./SettingsContext";
 import { useSettingsSaver } from "./useSettingsSaver";
 import "./Settings.css";
+import { IS_MACOS, SECRET_STORE } from "../lib/platform";
 
 const PANES: { id: SettingsPane; title: string; icon: IconName }[] = [
   { id: "accounts", title: "Accounts", icon: "person" },
@@ -156,7 +157,7 @@ export function Settings() {
     try {
       const reset = await resetSecrets();
       if (!reset) {
-        setResetError("The Keychain item couldn’t be reset.");
+        setResetError(`The ${SECRET_STORE.item} couldn’t be reset.`);
         return;
       }
       setError(null);
@@ -231,8 +232,8 @@ export function Settings() {
   return (
     <OpenSheetsContext.Provider value={openSheets}>
       <main className="settings">
-        {preview ? (
-          <nav className="toolbar" aria-label="Settings panes">
+        {preview || !IS_MACOS ? (
+          <nav className={IS_MACOS ? "toolbar" : "toolbar toolbar--titled"} aria-label="Settings panes">
             {PANES.map((p) => (
               <button
                 key={p.id}
@@ -263,7 +264,7 @@ export function Settings() {
           {view?.secrets_blocked ? (
             <div className="banner banner--error">
               <Icon name="warning" size={14} />
-              <span className="grow">Vigia can’t read its tokens from the Keychain.</span>
+              <span className="grow">Vigia can’t read its tokens from the {SECRET_STORE.store}.</span>
               <button type="button" onClick={retry}>
                 Try Again
               </button>
@@ -274,7 +275,7 @@ export function Settings() {
                   setResetOpen(true);
                 }}
               >
-                Reset Keychain Item…
+                Reset {SECRET_STORE.itemTitle}…
               </button>
             </div>
           ) : null}
@@ -300,8 +301,8 @@ export function Settings() {
 
         {resetOpen ? (
           <Sheet
-            title="Reset Keychain Item?"
-            message="Vigia replaces its unreadable Keychain item with an empty one. All stored tokens are removed and must be entered again for every account."
+            title={`Reset ${SECRET_STORE.itemTitle}?`}
+            message={`Vigia replaces its unreadable ${SECRET_STORE.item} with an empty one. All stored tokens are removed and must be entered again for every account.`}
             submitLabel="Reset"
             destructive
             busy={resetting}

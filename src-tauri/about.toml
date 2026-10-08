@@ -13,6 +13,11 @@ accepted = [
   "CC0-1.0",
   "BSL-1.0",
 ]
-targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+targets = [
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+  "x86_64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+]
 ignore-dev-dependencies = true
 ignore-build-dependencies = true

@@ -43,6 +43,21 @@ vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({ setTitle: (title: string) => setTitle(title) }),
 }));
 
+// The build platform, switchable per test; read on every render.
+let platform = "darwin";
+vi.mock("../lib/platform", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/platform")>();
+  return {
+    ...actual,
+    get IS_MACOS() {
+      return platform === "darwin";
+    },
+    get SECRET_STORE() {
+      return actual.secretStoreNames(platform);
+    },
+  };
+});
+
 vi.mock("./useSettingsSaver", () => ({ useSettingsSaver: () => vi.fn(async () => undefined) }));
 
 function stub(name: string) {
@@ -236,6 +251,31 @@ describe("open sheets", () => {
     await openResetSheet();
     act(() => openHandler?.(target({ pane: "general" })));
     expect(screen.getByTestId("pane-accounts")).toBeTruthy();
+  });
+});
+
+describe("Linux and Windows", () => {
+  afterEach(() => {
+    platform = "darwin";
+  });
+
+  it("draws its own pane switcher below the title bar", async () => {
+    platform = "windows";
+    await mount();
+    const nav = screen.getByRole("navigation", { name: "Settings panes" });
+    expect(nav.className).toBe("toolbar toolbar--titled");
+    fireEvent.click(screen.getByRole("button", { name: /General/ }));
+    expect(screen.getByTestId("pane-general")).toBeTruthy();
+    expect(selectSettingsPane).toHaveBeenLastCalledWith("general");
+  });
+
+  it("names the token store as the OS does", async () => {
+    platform = "linux";
+    getSettings.mockResolvedValue(makeView({ secrets_blocked: true }));
+    await mount();
+    expect(screen.getByText("Vigia can’t read its tokens from the keyring.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Reset Keyring Item…" }));
+    expect(screen.getByRole("alertdialog", { name: "Reset Keyring Item?" })).toBeTruthy();
   });
 });
 

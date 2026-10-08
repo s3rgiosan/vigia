@@ -1,10 +1,10 @@
 {
   "name": "vigia",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
-    "symbols": "swift scripts/export-symbols.swift",
+    "symbols": "node scripts/symbols.mjs",
     "predev": "npm run symbols",
     "dev": "vite",
     "prebuild": "npm run symbols",
@@ -20,6 +20,7 @@
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-clipboard-manager": "^2.4.1",
+    "lucide-static": "^1.47.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

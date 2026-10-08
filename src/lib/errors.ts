@@ -1,3 +1,5 @@
+import { SECRET_STORE } from "./platform";
+
 /** Longest raw backend text echoed back when no friendlier wording applies. */
 const MAX_RAW = 120;
 
@@ -62,7 +64,7 @@ function kindMessage(e: KindedError): string | null {
     case "decode":
       return "The server sent a reply Vigia doesn't understand. Check that the address is a GitHub or GitLab server.";
     case "keychain":
-      return "Vigia can’t read its tokens from the Keychain.";
+      return `Vigia can’t read its tokens from the ${SECRET_STORE.store}.`;
     case "read_only":
       return "Settings were saved by a newer version of Vigia, so changes can’t be saved.";
     case "invalid_input":
@@ -119,10 +121,10 @@ function friendlyText(message: string): string {
     return "The server sent a reply Vigia doesn't understand. Check that the address is a GitHub or GitLab server.";
   }
   if (text.startsWith("keychain access denied") || text.startsWith("keychain write blocked")) {
-    return "Vigia can't use the Keychain. Allow access when macOS asks, or reset the Keychain item.";
+    return `Vigia can't use the ${SECRET_STORE.store}. ${SECRET_STORE.deniedHint}`;
   }
   if (text.startsWith("stored tokens are not valid")) {
-    return "The tokens stored in the Keychain are unreadable. Reset the Keychain item and add them again.";
+    return `The tokens stored in the ${SECRET_STORE.store} are unreadable. Reset the ${SECRET_STORE.item} and add them again.`;
   }
   if (text.startsWith("the config was written by a newer")) {
     return "These settings were saved by a newer version of Vigia and can't be changed here.";

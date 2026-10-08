@@ -1,5 +1,6 @@
 import { authPopupMessage, authReason } from "./auth";
 import type { AccountSnapshot, RepoSnapshot, RepoStatus, Run, RunState, Snapshot, TrayColor } from "./snapshot";
+import { SECRET_STORE } from "./platform";
 
 export type SectionId = "failed" | "error" | "running" | "passing" | "none";
 
@@ -253,11 +254,11 @@ function clockTime(unix: number): string {
   return new Date(unix * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-/** User-facing text of a banner that is plain text. The Keychain and rejected-token banners add their own button. */
+/** User-facing text of a banner that is plain text. The token store and rejected-token banners add their own button. */
 export function bannerMessage(banner: Banner): string {
   switch (banner.kind) {
     case "secrets_blocked":
-      return "Vigia can’t read its tokens from the Keychain.";
+      return `Vigia can’t read its tokens from the ${SECRET_STORE.store}.`;
     case "config_error":
       return "Vigia couldn’t read its settings file, so changes won’t be saved.";
     case "config_read_only":

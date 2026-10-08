@@ -12,6 +12,7 @@ import { deleteAccount, deleteAllAccounts, renameAccount, replaceToken, type Acc
 import { AddAccountSheet, ReplaceTokenSheet } from "./AccountSheets";
 import { accountStatus, hostOf, pluralize, providerName } from "./accounts";
 import { useSettings, type SheetRequest } from "./SettingsContext";
+import { SECRET_STORE } from "../lib/platform";
 
 type SheetKind = "add" | "replace" | "remove" | "removeAll" | null;
 
@@ -194,7 +195,7 @@ export function AccountsTab({
       {sheet === "remove" ? (
         <Sheet
           title={`Remove “${selected.label}”?`}
-          message={`Vigia stops watching its ${pluralize(repoCount(selected.id), "repository", "repositories")} and deletes its token from the Keychain. The token itself stays valid on ${providerName(selected.kind)}.`}
+          message={`Vigia stops watching its ${pluralize(repoCount(selected.id), "repository", "repositories")} and deletes its token from the ${SECRET_STORE.store}. The token itself stays valid on ${providerName(selected.kind)}.`}
           submitLabel="Remove"
           destructive
           busy={removing}
@@ -207,7 +208,7 @@ export function AccountsTab({
       {sheet === "removeAll" ? (
         <Sheet
           title={`Remove all ${accounts.length} accounts?`}
-          message="Vigia stops watching every repository and deletes all tokens from the Keychain. Your other settings stay."
+          message={`Vigia stops watching every repository and deletes all tokens from the ${SECRET_STORE.store}. Your other settings stay.`}
           submitLabel="Remove All"
           destructive
           busy={removing}
@@ -270,7 +271,7 @@ function AccountDetail({
   }, [latest]);
 
   const { text } = accountStatus(status);
-  // The pane-level Keychain banner already covers an account whose token is unreadable.
+  // The pane-level token store banner already covers an account whose token is unreadable.
   const keychainBannerCovers = secretsBlocked && status !== undefined && authReason(status) === "keychain";
 
   return (
@@ -340,7 +341,7 @@ function AccountDetail({
             : "Personal access token with the read_api scope."
         }
       >
-        <FormRow label="Stored in the Keychain">
+        <FormRow label={`Stored in the ${SECRET_STORE.store}`}>
           <button type="button" onClick={onReplaceToken} disabled={secretsBlocked}>
             Replace Token…
           </button>

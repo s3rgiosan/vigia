@@ -1,12 +1,13 @@
-//! Tokens live in one Keychain item as a JSON map from account ID to token.
+//! Tokens live in one item of the OS credential store as a JSON map from account ID to token:
+//! the Keychain on macOS, Credential Manager on Windows and the Secret Service on Linux.
 
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-/// Account name of the single Keychain item.
+/// Account name of the single item.
 pub const ITEM_ACCOUNT: &str = "tokens";
 
-/// Service name for the Keychain item.
+/// Service name for the item.
 pub fn service_name(bundle_id: &str) -> String {
     bundle_id.to_string()
 }
@@ -28,7 +29,7 @@ pub trait SecretStore: Send + Sync {
     fn write(&self, value: &str) -> Result<(), SecretError>;
 }
 
-/// macOS Keychain through the `keyring` crate.
+/// The OS credential store through the `keyring` crate.
 pub struct KeychainStore {
     service: String,
 }
@@ -91,7 +92,7 @@ impl SecretStore for FileStore {
             .parent()
             .unwrap_or_else(|| std::path::Path::new("."));
         std::fs::create_dir_all(dir).map_err(denied)?;
-        // Temp files are created with mode 0600, so the tokens are never readable by others.
+        // On Unix, temp files are created with mode 0600, so the tokens are never readable by others.
         let mut temp = tempfile::NamedTempFile::new_in(dir).map_err(denied)?;
         temp.write_all(value.as_bytes()).map_err(denied)?;
         temp.as_file().sync_all().map_err(denied)?;
@@ -537,14 +538,18 @@ mod tests {
 
     #[test]
     fn file_store_round_trips_with_private_permissions() {
-        use std::os::unix::fs::PermissionsExt;
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("sub").join("tokens.json");
         let store = FileStore::new(path.clone());
         assert_eq!(store.read().unwrap(), None);
         store.write(r#"{"a":"x"}"#).unwrap();
         assert_eq!(store.read().unwrap().as_deref(), Some(r#"{"a":"x"}"#));
-        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
-        assert_eq!(mode & 0o777, 0o600);
+        // Windows has no mode bits; the file takes the access list of its folder.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
     }
 }
