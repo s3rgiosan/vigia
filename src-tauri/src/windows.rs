@@ -214,11 +214,18 @@ fn autostart_change(current: bool, wanted: bool) -> AutostartChange {
 /// Opens the Settings window at `target`, or focuses it and sends `SETTINGS_OPEN_EVENT` when it
 /// exists. The check and the build run on the main thread, so concurrent calls cannot both try
 /// to create the window.
+///
+/// The task is posted from another thread. Called on the main thread, `run_on_main_thread` runs
+/// it at once, inside the caller's command or menu handler, and building a webview there
+/// deadlocks WebView2 on Windows. Posted from elsewhere, it runs as its own event loop task.
 pub fn open_settings(app: &AppHandle, target: SettingsTarget) {
-    let handle = app.clone();
-    if let Err(e) = app.run_on_main_thread(move || open_settings_on_main(&handle, target)) {
-        log::error!("could not schedule opening settings: {e}");
-    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let handle = app.clone();
+        if let Err(e) = app.run_on_main_thread(move || open_settings_on_main(&handle, target)) {
+            log::error!("could not schedule opening settings: {e}");
+        }
+    });
 }
 
 fn open_settings_on_main(app: &AppHandle, target: SettingsTarget) {
