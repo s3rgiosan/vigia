@@ -4,7 +4,9 @@ Vigia is a Tauri v2 app: a React and TypeScript frontend in `src/` and a Rust ba
 
 ## Prerequisites
 
-- macOS. The build uses the system SF Symbols and WebKit.
+- macOS, Linux or Windows. Each platform builds its own bundles: `.dmg` on macOS, AppImage and `.deb` on Linux, an NSIS installer on Windows.
+- Linux: the Tauri system packages. On Debian and Ubuntu: `sudo apt install libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf build-essential`.
+- Windows: the Microsoft C++ Build Tools and WebView2 (preinstalled on Windows 11).
 - Node 22, the version CI uses.
 - A Rust toolchain at or above `rust-version` in `src-tauri/Cargo.toml`. CI runs the latest stable release.
 - Xcode 26 or later, only to rebuild the app icon with `scripts/build-app-icon.sh`.
@@ -17,13 +19,13 @@ npm ci
 npm run tauri dev
 ```
 
-`npm run symbols` exports the SF Symbols the icons use. It runs through the `predev`, `prebuild`, `pretest` and `precoverage` hooks, skips the work when the output is current, and needs macOS. When npm is configured with `ignore-scripts=true` the hooks are skipped, so run `npm run symbols` first. The output in `src/assets/symbols/` is generated and not tracked.
+`npm run symbols` exports the icons. On macOS it exports SF Symbols, skipping the work when the output is current. On Linux and Windows it copies Lucide icons, because the SF Symbols licence covers Apple platforms only. `VIGIA_SYMBOLS=lucide npm run symbols` exports the Lucide set on macOS, to check those builds; run `npm run symbols` again to switch back. It runs through the `predev`, `prebuild`, `pretest` and `precoverage` hooks. When npm is configured with `ignore-scripts=true` the hooks are skipped, so run `npm run symbols` first. The output in `src/assets/symbols/` is generated and not tracked.
 
-`npm run tauri build` produces a local `.dmg`.
+`npm run tauri build` produces the bundles for the current platform. `tauri.conf.json` holds the shared configuration, and `tauri.macos.conf.json`, `tauri.linux.conf.json` and `tauri.windows.conf.json` add each platform's bundle targets and popup window. Arrays such as `app.windows` replace the base value whole, so a platform file repeats the full window entry.
 
 ## Checks
 
-CI runs these on every pull request and push to `main`:
+CI runs these on macOS, Ubuntu 22.04 and Windows for every pull request and push to `main`:
 
 ```sh
 npm ci
@@ -44,7 +46,7 @@ cargo test
 
 ## Debug builds
 
-Debug builds skip the fine-grained check for tokens passed through `VIGIA_DEBUG_SETUP`, so `gh auth token` works there. They keep their settings in `config.dev.json` and their tokens in `tokens.dev.json`, both in `~/Library/Application Support/com.s3rgiosan.vigia/`, so they do not touch a release install or the Keychain. Three environment variables apply to them:
+Debug builds skip the fine-grained check for tokens passed through `VIGIA_DEBUG_SETUP`, so `gh auth token` works there. They keep their settings in `config.dev.json` and their tokens in `tokens.dev.json`, both in the app config folder (`~/Library/Application Support/com.s3rgiosan.vigia/` on macOS), so they do not touch a release install or the system credential store. Three environment variables apply to them:
 
 - `VIGIA_DEBUG_SETUP`: JSON describing accounts and repos to add at launch. See `src-tauri/src/debug_setup.rs`.
 - `VIGIA_DEBUG_SHOW_POPUP`: open the popup at launch.
@@ -82,8 +84,8 @@ VIGIA_GITLAB_URL=https://gitlab.example.com VIGIA_GITLAB_TOKEN=... cargo run --e
 
 ## Scripts
 
-- `scripts/export-symbols.swift` exports the SF Symbols as `src/assets/symbols/*.png` and `symbols.css`; run it with `npm run symbols`.
-- `scripts/gen-tray-icons.py` generates the menu bar icons (needs Pillow).
+- `scripts/symbols.mjs` exports the icons into `src/assets/symbols/`: SF Symbols through `scripts/export-symbols.swift` on macOS, Lucide SVGs elsewhere; run it with `npm run symbols`.
+- `scripts/gen-tray-icons.py` generates the menu bar icons, and the finished per-state images for Linux and Windows (needs Pillow).
 - `scripts/build-app-icon.sh` builds the app icon from the Icon Composer document `src-tauri/icons/AppIcon.icon` (needs Xcode 26 or later).
 - `scripts/third-party-licenses.sh` regenerates `THIRD-PARTY-LICENSES.md`.
 - `scripts/webkit-snapshot.swift <url> <width> <height> <out.png> <light|dark> [script]` renders a page in WebKit, the engine the app uses, so system colors resolve as they do in the app.
@@ -99,6 +101,6 @@ Run `sh scripts/third-party-licenses.sh` when dependencies change to regenerate 
 2. In `CHANGELOG.md` (Keep a Changelog), move the `## [Unreleased]` entries under a new `## [x.y.z] - YYYY-MM-DD` heading and update the link references at the bottom of the file.
 3. Push a tag with the same plain semver number and no `v` prefix, for example `1.0.0`.
 
-The release workflow runs the checks, verifies that the tag and the three versions match, builds a universal ad-hoc signed `.dmg`, signs the updater archive, and attaches both to a draft release. It needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the signing key itself stays outside the repository.
+The release workflow verifies that the tag and the three versions match, runs the checks on macOS, Ubuntu and Windows, and creates one draft release. A build matrix then attaches a universal ad-hoc signed `.dmg`, a Linux AppImage and `.deb` built on Ubuntu 22.04, and an unsigned Windows NSIS installer, signs each platform's updater bundle, and merges each platform into `latest.json`. It needs the repository secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`; the signing key itself stays outside the repository.
 
-Before publishing, test the `.dmg` and edit the release notes of the draft. The updater's `latest.json` embeds the release body, so the notes must be final before the release is published. Then publish the draft.
+Before publishing, test the bundles and edit the release notes of the draft. The updater's `latest.json` embeds the release body, so the notes must be final before the release is published. Then publish the draft.

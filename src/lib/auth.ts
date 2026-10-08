@@ -1,4 +1,5 @@
 import type { AccountSnapshot, AuthReason } from "./snapshot";
+import { SECRET_STORE } from "./platform";
 
 /** The cause of an account's auth error; a snapshot without a known reason counts as a rejected token. */
 export function authReason(account: Pick<AccountSnapshot, "auth_reason">): AuthReason {
@@ -17,7 +18,7 @@ export function authStatusText(reason: AuthReason): string {
     case "missing_token":
       return "No token saved";
     case "keychain":
-      return "Can’t read Keychain";
+      return `Can’t read ${SECRET_STORE.store}`;
     default:
       return "Token rejected";
   }
@@ -29,7 +30,7 @@ export function authSettingsMessage(reason: AuthReason): string {
     case "missing_token":
       return "No token is saved for this account. Add one with Replace Token… to start checking.";
     case "keychain":
-      return "Vigia can’t read its tokens from the Keychain.";
+      return `Vigia can’t read its tokens from the ${SECRET_STORE.store}.`;
     default:
       return "The token was rejected. Replace it to resume checking.";
   }
@@ -41,7 +42,7 @@ export function authPopupMessage(reason: AuthReason, label: string): string {
     case "missing_token":
       return `No token is saved for “${label}”.`;
     case "keychain":
-      return `Vigia can’t read the token for “${label}” from the Keychain.`;
+      return `Vigia can’t read the token for “${label}” from the ${SECRET_STORE.store}.`;
     default:
       return `The token for “${label}” was rejected.`;
   }

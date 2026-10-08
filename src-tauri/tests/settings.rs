@@ -6,6 +6,7 @@ use vigia_lib::app::Runtime;
 use vigia_lib::config::{
     Account, AccountKind, Config, ConfigStore, FilterSet, OrgFilters, Settings, WatchedRepo,
 };
+use vigia_lib::notes;
 use vigia_lib::providers::RepoInfo;
 use vigia_lib::secrets::{MemoryStore, Secrets};
 use vigia_lib::settings::{
@@ -178,11 +179,11 @@ async fn blocked_keychain_marks_every_repo_as_error() {
     assert_eq!(snapshot.repos[0].state.status, RepoStatus::Error);
     assert_eq!(
         snapshot.repos[0].state.note.as_deref(),
-        Some("Vigia can't read the Keychain")
+        Some(notes::KEYCHAIN_DENIED)
     );
     assert_eq!(
         snapshot.accounts[0].error.as_deref(),
-        Some("Vigia can't read the Keychain")
+        Some(notes::KEYCHAIN_DENIED)
     );
 }
 
@@ -636,7 +637,7 @@ async fn a_blocked_keychain_sets_the_typed_flag() {
     assert!(snapshot.accounts[0].keychain_denied);
     assert_eq!(
         snapshot.accounts[0].error.as_deref(),
-        Some("Vigia can't read the Keychain")
+        Some(notes::KEYCHAIN_DENIED)
     );
     assert!(sent.lock().unwrap().is_empty());
 }

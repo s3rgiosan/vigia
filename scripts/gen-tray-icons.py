@@ -12,6 +12,10 @@ menu bar; status color lives in a separate badge the app overlays on the lower r
 - `badge-{light,dark}-{status}.png`: a colored circle with a glyph (failed ×, error !,
   running …, passing ✓), in the system colors for a light or a dark menu bar.
 
+Linux and Windows draw tray images as they are, so each look also gets one finished image,
+`solid-{look}.png`: the porthole in white for a dark panel or taskbar, with the dark badge
+drawn into the notch.
+
 Run from the repo root after changing any value. `BADGE_CENTER` and `BADGE_SIZE` must match
 `BADGE_CENTER` and `BADGE_SIZE` in src-tauri/src/tray.rs.
 """
@@ -72,11 +76,13 @@ def downsample(img: Image.Image, size: int) -> Image.Image:
     return img.resize((size, size), Image.LANCZOS)
 
 
-def render_porthole(scale: int, notch: bool = False, dim: bool = False) -> Image.Image:
+def render_porthole(
+    scale: int, notch: bool = False, dim: bool = False, color=TEMPLATE
+) -> Image.Image:
     k = scale * SCALE
     img = Image.new("RGBA", (SIZE * k, SIZE * k), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    porthole(draw, k, TEMPLATE)
+    porthole(draw, k, color)
     if notch:
         bx, by = BADGE_CENTER[0] * k, BADGE_CENTER[1] * k
         r = (BADGE_SIZE / 2 + BADGE_GAP) * k
@@ -132,6 +138,20 @@ def render_badge(status: str, appearance: str, scale: int) -> Image.Image:
     return downsample(img, BADGE_SIZE * scale)
 
 
+def render_solid(look: str, scale: int) -> Image.Image:
+    """The porthole in white with the dark-panel badge for `look` drawn into its notch."""
+    if look == "idle":
+        return render_porthole(scale, color=WHITE)
+    if look == "paused":
+        return render_porthole(scale, dim=True, color=WHITE)
+    img = render_porthole(scale, notch=True, color=WHITE)
+    badge = render_badge(look, "dark", scale)
+    left = round((BADGE_CENTER[0] - BADGE_SIZE / 2) * scale)
+    top = round((BADGE_CENTER[1] - BADGE_SIZE / 2) * scale)
+    img.alpha_composite(badge, (left, top))
+    return img
+
+
 def main() -> None:
     out = Path(__file__).resolve().parent.parent / "src-tauri" / "icons" / "tray"
     out.mkdir(parents=True, exist_ok=True)
@@ -149,6 +169,9 @@ def main() -> None:
                     out / f"badge-{appearance}-{status}{suffix}.png"
                 )
                 count += 1
+        for look in ("idle", "paused", *STATUS):
+            render_solid(look, scale).save(out / f"solid-{look}{suffix}.png")
+            count += 1
     print(f"wrote {count} icons to {out}")
 
 

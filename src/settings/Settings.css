@@ -8,8 +8,8 @@
 
 /* Toolbar: sits under the overlay title bar, holds the pane tabs like System Settings. */
 /*
- * Preview-only stand-in for the native preferences toolbar: icon above label, each pane in its
- * own rounded button, a separator under the bar. Inside the app AppKit draws the real one.
+ * Pane switcher for the browser preview and for Linux and Windows: icon above label, each pane
+ * in its own rounded button, a separator under the bar. On macOS AppKit draws a native one.
  */
 .toolbar {
   display: flex;
@@ -17,6 +17,11 @@
   gap: 1px;
   padding: 34px 12px 8px;
   border-bottom: 1px solid var(--separator);
+}
+
+/* Linux and Windows draw a separate title bar above the webview. */
+.toolbar--titled {
+  padding-top: 8px;
 }
 
 .toolbar__tab {

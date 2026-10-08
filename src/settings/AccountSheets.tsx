@@ -15,6 +15,7 @@ import {
   type NewAccount,
 } from "../lib/tauri";
 import { defaultLabel, isInsecureUrl, providerName } from "./accounts";
+import { SECRET_STORE } from "../lib/platform";
 
 /** Server address the GitLab form starts with. */
 const DEFAULT_GITLAB_URL = "https://gitlab.com";
@@ -159,7 +160,7 @@ export function AddAccountSheet({
       <FormSection
         footer={
           kind === "gitlab"
-            ? "Personal access token with the read_api scope. Servers with an internal certificate authority work when it is trusted in the macOS Keychain."
+            ? `Personal access token with the read_api scope. Servers with an internal certificate authority work when it is trusted in ${SECRET_STORE.trustStore}.`
             : "One token covers one owner. Add another account for each organization."
         }
       >

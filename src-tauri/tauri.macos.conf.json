@@ -1,0 +1,41 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "app": {
+    "windows": [
+      {
+        "label": "popup",
+        "title": "Vigia",
+        "url": "index.html?view=popup",
+        "width": 380,
+        "height": 520,
+        "visible": false,
+        "decorations": false,
+        "resizable": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "transparent": true,
+        "shadow": true,
+        "windowEffects": {
+          "effects": [
+            "liquidGlassRegular",
+            "popover"
+          ],
+          "state": "active",
+          "radius": 18
+        }
+      }
+    ]
+  },
+  "bundle": {
+    "targets": [
+      "dmg"
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "-",
+      "files": {
+        "Resources/Assets.car": "./icons/Assets.car"
+      }
+    }
+  }
+}

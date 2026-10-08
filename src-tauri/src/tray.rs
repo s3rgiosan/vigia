@@ -5,6 +5,9 @@
 //! Failed, error, running and passing add a colored badge with a glyph in the lower right
 //! corner. The badge is an image view laid over the status bar button (see `badge`), drawn in
 //! the system colors for the menu bar's current light or dark appearance.
+//!
+//! Linux and Windows show tray images untinted and have no status bar button to lay a badge
+//! over, so each look there is one finished image: a white porthole with the badge drawn in.
 
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
@@ -146,7 +149,7 @@ impl TrayLook {
         }
     }
 
-    /// Which template image the status bar button shows.
+    /// Which template image the status bar button shows on macOS.
     fn icon_kind(self) -> IconKind {
         match self {
             TrayLook::Idle => IconKind::Plain,
@@ -157,11 +160,34 @@ impl TrayLook {
         }
     }
 
+    #[cfg(target_os = "macos")]
     fn icon(self) -> Image<'static> {
         match self.icon_kind() {
             IconKind::Plain => tauri::include_image!("icons/tray/porthole@2x.png"),
             IconKind::Paused => tauri::include_image!("icons/tray/paused@2x.png"),
             IconKind::Badged => tauri::include_image!("icons/tray/porthole-badged@2x.png"),
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    fn icon(self) -> Image<'static> {
+        match self {
+            TrayLook::Failed => tauri::include_image!("icons/tray/solid-failed@2x.png"),
+            TrayLook::Error => tauri::include_image!("icons/tray/solid-error@2x.png"),
+            TrayLook::Running => tauri::include_image!("icons/tray/solid-running@2x.png"),
+            TrayLook::Success => tauri::include_image!("icons/tray/solid-passing@2x.png"),
+            TrayLook::Idle => tauri::include_image!("icons/tray/solid-idle@2x.png"),
+            TrayLook::Paused => tauri::include_image!("icons/tray/solid-paused@2x.png"),
+        }
+    }
+
+    /// Whether the tray image differs from the one `before` shows. Badged looks share one
+    /// template image on macOS; elsewhere every look has its own image.
+    fn image_differs(self, before: TrayLook) -> bool {
+        if cfg!(target_os = "macos") {
+            self.icon_kind() != before.icon_kind()
+        } else {
+            self != before
         }
     }
 
@@ -224,6 +250,8 @@ enum IconKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuBar {
     Light,
+    // Only macOS reads the menu bar's appearance.
+    #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
     Dark,
 }
 
@@ -245,7 +273,7 @@ fn redraw(shown: Option<(TrayLook, MenuBar)>, look: Option<TrayLook>, bar: MenuB
     if shown == Some((look, bar)) {
         return Redraw::PlaceBadge;
     }
-    let icon = shown.is_none_or(|(before, _)| look.icon_kind() != before.icon_kind());
+    let icon = shown.is_none_or(|(before, _)| look.image_differs(before));
     Redraw::Draw { look, icon }
 }
 
@@ -342,6 +370,7 @@ fn place_badge<R: Runtime>(tray: &TrayIcon<R>) {
 fn place_badge<R: Runtime>(_tray: &TrayIcon<R>) {}
 
 /// What VoiceOver reads for the status item: the app's name and the tooltip's state.
+#[cfg(any(target_os = "macos", test))]
 fn accessibility_label(tooltip: &str) -> String {
     if tooltip.is_empty() {
         return "Vigia".to_string();
@@ -578,6 +607,7 @@ mod badge {
 
 /// Redraws the icon when the menu bar switched between light and dark since the last update.
 /// On the main thread it redraws at once; elsewhere the redraw is queued on the main loop.
+#[cfg(target_os = "macos")]
 pub fn refresh_appearance<R: Runtime>(app: &AppHandle<R>) {
     let handle = app.clone();
     let _ = app.run_on_main_thread(move || {
@@ -762,21 +792,28 @@ pub fn toggle_popup<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// Shows the popup under the tray icon and focuses it so that a later blur hides it.
+/// Shows the popup by the tray icon and focuses it so that a later blur hides it.
 pub fn show_popup<R: Runtime>(app: &AppHandle<R>) {
     let Some(window) = app.get_webview_window(POPUP_LABEL) else {
         return;
     };
-    let placed = window
-        .as_ref()
-        .window()
-        .move_window(Position::TrayBottomCenter);
-    if placed.is_err() {
-        place_without_tray_rect(app, &window);
-    }
+    place_popup(app, &window);
     let _ = window.show();
     let _ = window.set_focus();
     set_highlight(app, true);
+}
+
+/// Places the popup by the tray icon: under it on macOS and Linux, above it on Windows, where
+/// the taskbar usually sits at the bottom of the screen. Windows keeps the popup on screen, and
+/// below the icon when the taskbar is at the top.
+pub fn place_popup<R: Runtime>(app: &AppHandle<R>, window: &tauri::WebviewWindow<R>) {
+    #[cfg(target_os = "windows")]
+    let placed = window.move_window_constrained(Position::TrayCenter);
+    #[cfg(not(target_os = "windows"))]
+    let placed = window.move_window(Position::TrayBottomCenter);
+    if placed.is_err() {
+        place_without_tray_rect(app, window);
+    }
 }
 
 /// Positions the popup when the positioner has no tray rect yet: below the tray icon if the
@@ -890,7 +927,7 @@ mod tests {
     }
 
     #[test]
-    fn every_look_has_a_template_icon_and_a_label() {
+    fn every_look_has_an_icon_and_a_label() {
         for look in TrayLook::ALL {
             let icon = look.icon();
             assert!(icon.width() > 0 && icon.height() > 0);
@@ -977,12 +1014,12 @@ mod tests {
                 icon: false
             }
         );
-        // Badged looks share one template image.
+        // Badged looks share one template image on macOS.
         assert_eq!(
             redraw(shown, Some(TrayLook::Running), Light),
             Redraw::Draw {
                 look: TrayLook::Running,
-                icon: false
+                icon: !cfg!(target_os = "macos")
             }
         );
         assert_eq!(

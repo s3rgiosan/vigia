@@ -8,56 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  secrets:
+  preflight:
     runs-on: ubuntu-latest
-    steps:
-      - name: Check that the updater signing secrets are set
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          missing=0
-          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::The repository secret $name is not set; the updater artifacts cannot be signed."
-              missing=1
-            fi
-          done
-          exit "$missing"
-
-  check:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: 22
-          cache: npm
-
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-
-      - run: npm ci
-      - run: npm run typecheck
-      - run: npm test
-
-      - run: cargo fmt --check
-        working-directory: src-tauri
-      - run: cargo clippy --all-targets -- -D warnings
-        working-directory: src-tauri
-      - run: cargo test
-        working-directory: src-tauri
-
-  release:
-    needs: [secrets, check]
-    runs-on: macos-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -75,6 +27,107 @@ jobs:
             exit 1
           fi
 
+      - name: Check that the updater signing secrets are set
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          missing=0
+          for name in TAURI_SIGNING_PRIVATE_KEY TAURI_SIGNING_PRIVATE_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::The repository secret $name is not set; the updater artifacts cannot be signed."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-22.04, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - name: Install the Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+      - run: cargo fmt --check
+        working-directory: src-tauri
+      - run: cargo clippy --all-targets -- -D warnings
+        working-directory: src-tauri
+      - run: cargo test
+        working-directory: src-tauri
+
+  # One draft release for the matrix below, so parallel builds never create one each.
+  create-release:
+    needs: [preflight, check]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      id: ${{ steps.draft.outputs.id }}
+    steps:
+      - id: draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          BODY: 'Builds for macOS (universal), Linux (AppImage and deb) and Windows (installer). See the README for first-launch steps.'
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq ".[] | select(.draft and .tag_name == \"$TAG\") | .id" | head -n1)
+          if [ -z "$id" ]; then
+            id=$(gh api -X POST "repos/$GITHUB_REPOSITORY/releases" \
+              -f tag_name="$TAG" -f name="$TAG" -f body="$BODY" -F draft=true --jq .id)
+          fi
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+
+  release:
+    needs: create-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One universal build for Apple silicon and Intel; latest.json points both
+          # darwin-aarch64 and darwin-x86_64 at its archive.
+          - platform: macos-latest
+            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+            args: --target universal-apple-darwin --config '{"bundle":{"createUpdaterArtifacts":true,"targets":["app","dmg"]}}'
+          # The oldest supported Ubuntu, so the binary runs on systems with an older glibc.
+          - platform: ubuntu-22.04
+            rust-targets: x86_64-unknown-linux-gnu
+            args: --config '{"bundle":{"createUpdaterArtifacts":true}}'
+          - platform: windows-latest
+            rust-targets: x86_64-pc-windows-msvc
+            args: --config '{"bundle":{"createUpdaterArtifacts":true}}'
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
@@ -82,22 +135,27 @@ jobs:
       - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable
         with:
           toolchain: stable
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+          targets: ${{ matrix.rust-targets }}
+
+      - name: Install the Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf
 
       - run: npm ci
 
-      # Also bundles and signs Vigia.app.tar.gz for the updater, and uploads latest.json, whose
-      # darwin-aarch64 and darwin-x86_64 entries both point at that universal archive.
-      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # action-v0.6.2
+      # Also signs the updater bundles (the macOS .app.tar.gz, the AppImage and the NSIS
+      # installer) and merges this platform's entries into the release's latest.json.
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # action-v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
-          tagName: ${{ github.ref_name }}
-          releaseName: ${{ github.ref_name }}
-          releaseBody: 'Universal macOS build. See the README for first-launch steps.'
-          releaseDraft: true
-          prerelease: false
-          includeUpdaterJson: true
-          args: --target universal-apple-darwin --config '{"bundle":{"createUpdaterArtifacts":true,"targets":["app","dmg"]}}'
+          releaseId: ${{ needs.create-release.outputs.id }}
+          # The notes of latest.json; the release body comes from create-release.
+          releaseBody: 'Builds for macOS (universal), Linux (AppImage and deb) and Windows (installer). See the README for first-launch steps.'
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }}

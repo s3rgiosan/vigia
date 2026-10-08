@@ -4,6 +4,7 @@ import type { StoppedRepo } from "../lib/contextMenu";
 import { friendlyError } from "../lib/errors";
 import { buildBanners, buildSections, formatInterval, relativeTime, summarize } from "../lib/grouping";
 import { useDocumentVisible } from "../lib/hooks/useDocumentVisible";
+import { IS_MACOS } from "../lib/platform";
 import type { Snapshot, UpdateInfo } from "../lib/snapshot";
 import {
   getSnapshot,
@@ -43,6 +44,8 @@ const TICK_MS = 30_000;
 
 /** Selector for every keyboard-navigable row, in document order. */
 const NAV = "[data-nav]";
+
+const PANEL_CLASS = IS_MACOS ? "popup" : "popup popup--opaque";
 
 export function Popup() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -220,12 +223,12 @@ export function Popup() {
   }
 
   if (!snapshot) {
-    return <main className="popup" ref={panelRef} />;
+    return <main className={PANEL_CLASS} ref={panelRef} />;
   }
 
   if (noAccounts) {
     return (
-      <main className="popup popup--empty" ref={panelRef}>
+      <main className={`${PANEL_CLASS} popup--empty`} ref={panelRef}>
         <div className="empty" data-fit="empty">
           <div className="empty__mark" aria-hidden="true">
             <span className="dot dot--gray" />
@@ -249,7 +252,7 @@ export function Popup() {
   const noneWatched = snapshot.repos.length === 0;
 
   return (
-    <main className="popup" ref={panelRef} onKeyDown={onListKey}>
+    <main className={PANEL_CLASS} ref={panelRef} onKeyDown={onListKey}>
       <header className="popup__header">
         <span className={`dot dot--lg dot--${snapshot.color}`} aria-hidden="true" />
         <div className="popup__title" aria-live="polite">

@@ -31,7 +31,9 @@ use tauri::{AppHandle, Emitter, Manager, Wry};
 
 use crate::app::{Runtime, SNAPSHOT_EVENT};
 use crate::config::{ConfigStore, DEV_FILE_NAME, FILE_NAME};
-use crate::notify::{ClickTarget, Notification};
+#[cfg(target_os = "macos")]
+use crate::notify::ClickTarget;
+use crate::notify::Notification;
 use crate::poller::Snapshot;
 use crate::secrets::{SecretStore, Secrets};
 use crate::updates::{UpdateCheckResult, UpdateManager, UPDATE_CHECK_RESULT_EVENT};
@@ -204,8 +206,8 @@ pub fn run() {
             if let Some(popup) = app.get_webview_window(tray::POPUP_LABEL) {
                 let window = popup.clone();
                 let blur_handle = handle.clone();
-                popup.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Focused(false) = event {
+                popup.on_window_event(move |event| match event {
+                    tauri::WindowEvent::Focused(false) => {
                         let was_visible = window.is_visible().unwrap_or(false);
                         if was_visible {
                             tray::note_blur_hide();
@@ -213,6 +215,12 @@ pub fn run() {
                         let _ = window.hide();
                         tray::set_highlight(&blur_handle, false);
                     }
+                    // The popup sits above the taskbar, so it grows upward as its content fits.
+                    #[cfg(target_os = "windows")]
+                    tauri::WindowEvent::Resized(_) if window.is_visible().unwrap_or(false) => {
+                        tray::place_popup(&blur_handle, &window);
+                    }
+                    _ => {}
                 });
             }
 

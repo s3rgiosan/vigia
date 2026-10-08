@@ -4,7 +4,7 @@ Vigia shows the CI status of watched repositories as a colored badge on a menu b
 
 ## 1. Overview and scope
 
-Vigia runs on macOS as a menu bar app. It reads GitHub Actions runs from github.com and GitLab CI pipelines from gitlab.com or a self-managed GitLab instance. The Rust backend in `src-tauri/` owns polling, state, notifications, storage and the tray. The React and TypeScript frontend in `src/` renders two windows, the popup and Settings, and holds no state of its own beyond the latest snapshot.
+Vigia runs on macOS as a menu bar app, and on Linux and Windows as a tray app. It reads GitHub Actions runs from github.com and GitLab CI pipelines from gitlab.com or a self-managed GitLab instance. The Rust backend in `src-tauri/` owns polling, state, notifications, storage and the tray. The React and TypeScript frontend in `src/` renders two windows, the popup and Settings, and holds no state of its own beyond the latest snapshot.
 
 Stack: Tauri v2, Rust 2021 (`rust-version` 1.94; `[lints.clippy] all = "deny"`; reqwest, tokio, globset, keyring, objc2 for AppKit), React 19, Vite, Vitest.
 
@@ -14,7 +14,7 @@ Out of scope:
 
 - GitHub Enterprise Server (the GitHub API origin is fixed to `https://api.github.com`).
 - OAuth or device-flow sign-in; accounts use personal access tokens.
-- Windows and Linux.
+- Linux and Windows on Arm, and Linux packages other than AppImage and deb.
 - Triggering, cancelling or re-running jobs, and viewing logs.
 - GitLab child pipelines and other CI systems.
 - Per-account pause (pause is global).
@@ -23,14 +23,30 @@ Out of scope:
 
 ## 2. Process layout
 
-Entry point: `src-tauri/src/lib.rs` (`run`). Window creation lives in `windows.rs` and `tray.rs`; the window definition is in `tauri.conf.json`.
+Entry point: `src-tauri/src/lib.rs` (`run`). Window creation lives in `windows.rs` and `tray.rs`; the window definition is in `tauri.conf.json` and the platform files beside it.
+
+### Platforms
+
+`tauri.conf.json` holds the shared configuration. `tauri.macos.conf.json`, `tauri.linux.conf.json` and `tauri.windows.conf.json` are merged over it (JSON Merge Patch) and set each platform's bundle targets (`dmg`; `appimage` and `deb`; `nsis` for the current user) and its popup window entry. Arrays replace the base value whole, so each platform file that changes the popup repeats its full entry. `macOSPrivateApi` stays in the base file, because `tauri-build` checks it against the `macos-private-api` Cargo feature; it has no effect off macOS.
+
+AppKit code is behind `cfg(target_os = "macos")`, with no-op or plain Tauri fallbacks elsewhere. The frontend learns the platform from `TAURI_ENV_PLATFORM`, which the Tauri CLI sets for `tauri dev` and `tauri build` and Vite exposes through `envPrefix` (`src/lib/platform.ts`). The browser preview and the tests have no platform and follow macOS.
+
+| Area | macOS | Linux and Windows |
+| --- | --- | --- |
+| Popup window | transparent, with window effects | opaque and square (`popup--opaque`) |
+| Tray image | template image plus an AppKit badge view | one finished image per look |
+| Tray click | toggles the popup | Windows toggles the popup; Linux opens the tray menu, whose first item is Open Vigia |
+| Settings pane switcher | native toolbar | the page's own toolbar (`toolbar--titled`) |
+| Icons | SF Symbols | Lucide |
+| Token store | Keychain | Credential Manager; Secret Service keyring |
+| Notification click | opens the run or the popup | none |
 
 ### Windows
 
 | Window | Label | Size | Behavior |
 | --- | --- | --- | --- |
-| Popup | `popup` | 380 wide, height set by the page | Created hidden at launch. No decorations, always on top, transparent, with the `liquidGlassRegular` and `popover` window effects. Hides when it loses focus. |
-| Settings | `settings` | 680 x 560, fixed | Created on demand, focused when it already exists. Has a native AppKit preferences toolbar (`settings_toolbar.rs`) that the page disables while a sheet is open. |
+| Popup | `popup` | 380 wide, height set by the page | Created hidden at launch. No decorations, always on top. On macOS it is transparent, with the `liquidGlassRegular` and `popover` window effects. Hides when it loses focus. |
+| Settings | `settings` | 680 x 560, fixed | Created on demand, focused when it already exists. On macOS it has a native AppKit preferences toolbar (`settings_toolbar.rs`) that the page disables while a sheet is open. |
 
 Both windows load `index.html`; the `view` query parameter (`popup` or `settings`) selects the React view (`src/lib/view.ts`). Settings also accepts `pane` (`accounts`, `repos`, `branches`, `general`; the `branches` pane is titled Filters), `sheet` (`add`, or `replace` with an `account` parameter naming an existing account), and `account`; unknown values are dropped, and a `replace` sheet without a known account is dropped with it (`SettingsTarget`, `SettingsPane` and `SettingsSheet` in `windows.rs`).
 
@@ -46,9 +62,11 @@ The tray icon (`tray.rs`) is the porthole mark as a template image. A status bad
 | Idle | tray color gray | plain porthole |
 | Paused | paused | dimmed porthole, no badge |
 
+Linux and Windows show tray images untinted and have no status item to lay a badge over, so each look there is one finished image (`solid-<look>@2x.png`): the porthole in white with the dark-menu-bar badge drawn into its notch.
+
 Badge artwork exists for light and dark menu bars. A zero-sized view added to the status item receives `viewDidChangeEffectiveAppearance` when the menu bar turns light or dark, and the icon is redrawn then. The status item's accessibility label is `Vigia, <tooltip>`, kept in step with the tooltip. A left click toggles the popup. A click within 200 ms of a blur-triggered hide does not reopen it. The right-click menu has Open Vigia, Refresh Now (Cmd+R), Pause or Resume, Settings (Cmd+,), About, Check for Updates, and Quit (Cmd+Q). The About panel shows the version once (the build number is hidden) and the description as its credits. Debug builds add a Debug submenu that forces each look.
 
-The popup is placed under the tray icon with `tauri-plugin-positioner`. When the tray rectangle is unknown it falls back to below the icon, then to the top-right of the primary monitor's work area.
+The popup is placed by the tray icon with `tauri-plugin-positioner` (`tray::place_popup`): under it on macOS and Linux, and above it on Windows, constrained to the screen, where it moves below the icon when the taskbar is at the top. On Windows each resize of the visible popup places it again, so it grows upward from the taskbar. When the tray rectangle is unknown, as always on Linux, it falls back to below the icon, then to the top-right of the primary monitor's work area. Wayland ignores window positions, so there the compositor places the popup.
 
 ### Single instance
 
@@ -393,7 +411,7 @@ When an account's token is rejected, one notification (`<label>: token rejected`
 | Run | a single transition | opens the run URL in the default browser after the URL guard (section 7); shows the popup when the account is gone or the URL is rejected |
 | Popup | summaries and account problems | shows the popup |
 
-Delivery on macOS uses `mac-notification-sys`. Each notification waits for its click on its own thread. At most 8 notifications wait at once; past that a notification is still shown but a click only brings the app forward. A notification that is dismissed or removed from Notification Center never reports a click. Debug builds attribute notifications to Terminal because they have no registered bundle. The app asks for notification permission after an account is added and when a notification switch is turned on, but only while macOS has not yet recorded an answer (`notifications::ensure_permission`).
+Linux and Windows deliver through `tauri-plugin-notification`, which reports no clicks. Delivery on macOS uses `mac-notification-sys`. Each notification waits for its click on its own thread. At most 8 notifications wait at once; past that a notification is still shown but a click only brings the app forward. A notification that is dismissed or removed from Notification Center never reports a click. Debug builds attribute notifications to Terminal because they have no registered bundle. The app asks for notification permission after an account is added and when a notification switch is turned on, but only while macOS has not yet recorded an answer (`notifications::ensure_permission`).
 
 ## 7. Storage and security
 
@@ -418,11 +436,11 @@ A file that does not parse is renamed to `config.json.corrupt-<unix time>` and t
 
 Debug builds use `config.dev.json` and keep tokens in `tokens.dev.json` (a plain file with owner-only permissions) so a rebuilt, re-signed app does not hit Keychain denials and never touches a release install. `VIGIA_DEBUG_SETUP` (JSON of accounts and repos, with tokens read from named environment variables) adds accounts at launch; `VIGIA_DEBUG_SHOW_POPUP` and `VIGIA_DEBUG_OPEN_SETTINGS` open a window at launch. These exist only in debug builds.
 
-### Keychain
+### Credential store
 
 The startup log records only the load state (`loaded`, `not found`, or `failed` with a reason). A JSON parse failure is described by its category and position, never by quoting the stored content.
 
-Tokens live in one Keychain item: service is the bundle identifier, account is `tokens`, and the value is a JSON map from account ID to token. The map is loaded once and kept in memory.
+Tokens live in one item of the OS credential store, through the `keyring` crate: the Keychain on macOS, Credential Manager on Windows and the Secret Service on Linux. Service is the bundle identifier, account is `tokens`, and the value is a JSON map from account ID to token. The map is loaded once and kept in memory. User-facing text names the store as the OS does (`SECRET_STORE` in `src/lib/platform.ts`, `notes::KEYCHAIN_DENIED`); the examples below use the macOS names.
 
 A failed load (access denied or unparsable JSON) puts the store in a blocked state: every token write fails, the snapshot has `secrets_blocked`, accounts show "Vigia can't read the Keychain", and both windows show a banner. "Try Again" (`retry_secrets`) reloads and restarts polling when the load works. "Reset Keychain Item…" (`reset_secrets`) overwrites the item with an empty map after a confirmation sheet, discarding every token, and clears the blocked state.
 
@@ -460,7 +478,7 @@ Files: `src/popup/`, `src/settings/`, `src/components/`, `src/lib/`.
 
 Payloads from the backend pass runtime shape checks (`lib/guards.ts`: `isSnapshot`, `isSettingsView`) before they reach state. A rejected command arrives as `{ kind, message }` and `friendlyError` (`lib/errors.ts`) chooses the sentence by `kind`: for example `unauthorized` reads "The server rejected this token. Check it's copied in full and hasn't expired.", `keychain` reads "Vigia can’t read its tokens from the Keychain.", and `invalid_input` shows the backend message. An `internal` error, or a plain string, shows a shortened copy of its text after "Something went wrong:".
 
-`Icon` draws each SF Symbol export as a CSS mask through the class `symbol symbol--<name>` (`src/assets/symbols/symbols.css`).
+`Icon` draws each exported icon (SF Symbols on macOS, Lucide elsewhere) as a CSS mask through the class `symbol symbol--<name>` (`src/assets/symbols/symbols.css`).
 
 The build target is `safari13`, the oldest WebKit the app supports (`vite.config.ts`). Opening links goes through the Rust `open_url` command; the frontend has no opener plugin.
 
@@ -509,7 +527,7 @@ The popup is 380 pt wide. The page measures its content and calls `setSize` so t
 
 ### Settings
 
-Four panes, switched from the native toolbar, with Cmd+1 to Cmd+4, or by `settings-open` events. The window title names the current pane. The last pane is remembered through `useSafeStorage`, which uses `localStorage` and falls back to memory when storage is missing or throws.
+Four panes, switched from the native toolbar (the page's own toolbar off macOS and in the browser preview), with Cmd+1 to Cmd+4, or by `settings-open` events. The window title names the current pane. The last pane is remembered through `useSafeStorage`, which uses `localStorage` and falls back to memory when storage is missing or throws.
 
 | Pane | Contents |
 | --- | --- |
@@ -543,12 +561,12 @@ State is never color alone. Every status dot is `aria-hidden` and is paired with
 | `npm ci` | Install JavaScript dependencies |
 | `npm run tauri dev` | Run the app in development (Vite on port 1420) |
 | `npm run dev` | Vite alone: with no Tauri runtime, a fake backend serves the windows at `?view=popup` and `?view=settings` (`&scenario=empty` for the empty state), and `?view=gallery` shows every control |
-| `npm run symbols` | Export the SF Symbols as PNGs and `symbols.css` into `src/assets/symbols` (macOS only; skipped when the output is current). Runs through the `predev`, `prebuild`, `pretest` and `precoverage` hooks; the output is not tracked in git. When npm runs with `ignore-scripts=true` the hooks are skipped, so run `npm run symbols` first. |
+| `npm run symbols` | Export the icons and `symbols.css` into `src/assets/symbols` (`scripts/symbols.mjs`): SF Symbols as PNGs on macOS (skipped when the output is current), Lucide SVGs on Linux and Windows or with `VIGIA_SYMBOLS=lucide`. A `.source` file names the exported set, and a switch of set clears the directory first. Runs through the `predev`, `prebuild`, `pretest` and `precoverage` hooks; the output is not tracked in git. When npm runs with `ignore-scripts=true` the hooks are skipped, so run `npm run symbols` first. |
 | `npm run build` | `tsc` then `vite build` (runs `npm run symbols` first) |
 | `npm run typecheck` | `tsc --noEmit` |
 | `npm test` | Vitest |
 | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test` | Rust checks, run from `src-tauri/` |
-| `npm run tauri build` | Produce the `.dmg` bundle; `beforeBuildCommand` runs `npm run build`, so the symbols are exported first |
+| `npm run tauri build` | Produce the current platform's bundles; `beforeBuildCommand` runs `npm run build`, so the symbols are exported first |
 
 `cargo run --example probe -- <github|gitlab> <owner/name>` (from `src-tauri/`) prints the state of one real repo using tokens from environment variables.
 
@@ -569,27 +587,28 @@ Coverage:
 
 | File | What it does |
 | --- | --- |
-| `scripts/build-app-icon.sh` | Compiles `src-tauri/icons/AppIcon.icon` with `actool` into `Assets.car`, exports a flat render, runs `tauri icon` to generate the `.icns` and PNG sizes, and removes non-macOS outputs. Needs Xcode 26 or later. |
-| `scripts/gen-tray-icons.py` | Renders the porthole, paused and badged template images and the light and dark status badges into `src-tauri/icons/tray`. Needs Pillow. `BADGE_CENTER` and `BADGE_SIZE` match the constants in `tray.rs`. |
+| `scripts/build-app-icon.sh` | Compiles `src-tauri/icons/AppIcon.icon` with `actool` into `Assets.car`, exports a flat render, runs `tauri icon` to generate the `.icns`, `.ico` and PNG sizes, and removes the mobile and Microsoft Store outputs. Needs Xcode 26 or later. |
+| `scripts/gen-tray-icons.py` | Renders the porthole, paused and badged template images, the light and dark status badges, and the finished Linux and Windows image of each look into `src-tauri/icons/tray`. Needs Pillow. `BADGE_CENTER` and `BADGE_SIZE` match the constants in `tray.rs`. |
+| `scripts/symbols.mjs` | Exports the icons used by `src/components/Icon.tsx` into `src/assets/symbols`: SF Symbols through `export-symbols.swift` on macOS, Lucide SVGs from `lucide-static` elsewhere. |
 | `scripts/export-symbols.swift` | Exports the SF Symbols used by `src/components/Icon.tsx` as PNGs into `src/assets/symbols`. |
-| `scripts/third-party-licenses.sh` | Regenerates `THIRD-PARTY-LICENSES.md`, the notices for the npm and Cargo dependencies. |
+| `scripts/third-party-licenses.sh` | Regenerates `THIRD-PARTY-LICENSES.md`, the notices for the npm and Cargo dependencies of every shipped target (`targets` in `src-tauri/about.toml`). |
 | `scripts/webkit-snapshot.swift` | Renders a URL in `WKWebView` and saves a PNG for light or dark appearance, so system colors resolve as in the app. |
 | `scripts/appkit-reference.swift` | Renders real AppKit controls as a visual reference for the webview's controls. |
 
 ### App icon
 
-`src-tauri/icons/AppIcon.icon` is the Icon Composer source. `Assets.car` is bundled into `Resources/` (`bundle.macOS.files`) and `Info.plist` names it through `CFBundleIconName`, so macOS 26 renders the layered icon. The `.icns` and PNG files are the fallback for older systems and for development.
+`src-tauri/icons/AppIcon.icon` is the Icon Composer source. `Assets.car` is bundled into `Resources/` (`bundle.macOS.files`) and `Info.plist` names it through `CFBundleIconName`, so macOS 26 renders the layered icon. The `.icns` and PNG files are the fallback for older systems and for development. Linux bundles use the PNG files and Windows the `.ico`.
 
 ### CI
 
-`.github/workflows/ci.yml` runs on pull requests and pushes to `main`, on `macos-latest` with Node 22 and stable Rust: `npm ci`, `npm run build`, `npm test`, then `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test` in `src-tauri/`. Every action is pinned to a commit SHA with its version in a comment. The workflow has `contents: read` permission and a concurrency group per ref that cancels superseded runs except on `main`.
+`.github/workflows/ci.yml` runs on pull requests and pushes to `main`, on `macos-latest`, `ubuntu-22.04` (after installing the WebKitGTK, AppIndicator and other Tauri system packages) and `windows-latest`, with Node 22 and stable Rust: `npm ci`, `npm run build`, `npm test`, then `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test` in `src-tauri/`. Every action is pinned to a commit SHA with its version in a comment. The workflow has `contents: read` permission and a concurrency group per ref that cancels superseded runs except on `main`.
 
 ### Release
 
-`.github/workflows/release.yml` triggers on a tag of plain semver form, `[0-9]+.[0-9]+.[0-9]+`, with no `v` prefix. Its `check` job runs `npm run typecheck`, `npm test`, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test`. The `release` job needs `check`, is the only job with `contents: write`, and checks out without persisting credentials. It first verifies that the tag equals the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, and fails otherwise. It then runs `npm ci` and builds with `tauri-apps/tauri-action` (its `beforeBuildCommand` exports the symbols) for `universal-apple-darwin` (aarch64 and x86_64) and attaches the `.dmg` to a draft release named after the tag. The release job restores no build caches.
+`.github/workflows/release.yml` triggers on a tag of plain semver form, `[0-9]+.[0-9]+.[0-9]+`, with no `v` prefix. Its `preflight` job verifies that the tag equals the version in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`, and that the updater signing secrets are set. Its `check` job runs `npm run typecheck`, `npm test`, `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings` and `cargo test` on macOS, Ubuntu 22.04 and Windows. After both, `create-release` finds or creates the tag's draft release, so the parallel builds share one. The `release` matrix then builds with `tauri-apps/tauri-action` (its `beforeBuildCommand` exports the icons) and uploads to that draft by `releaseId`: `universal-apple-darwin` (aarch64 and x86_64) on macOS, x86_64 Linux on `ubuntu-22.04` so the binary runs with glibc 2.35 and later, and x86_64 Windows. Only `create-release` and `release` have `contents: write`; checkouts do not persist credentials. The release jobs restore no build caches.
 
-Updater artifacts are built only in CI. `tauri.conf.json` keeps `bundle.createUpdaterArtifacts` off, so a local `npm run tauri build` needs no signing key. The release build passes `--config '{"bundle":{"createUpdaterArtifacts":true,"targets":["app","dmg"]}}'`, which also bundles `Vigia.app.tar.gz` and its `.sig`, signed with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets. A `secrets` job fails the run at once when either is missing, and `release` needs it. With `includeUpdaterJson`, tauri-action uploads `latest.json`; for a universal build it writes `darwin-aarch64`, `darwin-x86_64`, `darwin-aarch64-app` and `darwin-x86_64-app` entries, all pointing at the universal archive, with the release body as `notes`. The `releases/latest` URL resolves once the draft is published.
+Updater artifacts are built only in CI. `tauri.conf.json` keeps `bundle.createUpdaterArtifacts` off, so a local `npm run tauri build` needs no signing key. Each release build passes `--config '{"bundle":{"createUpdaterArtifacts":true}}'` (macOS adds `"targets":["app","dmg"]`), which signs the updater bundles with the `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` repository secrets: the `.app.tar.gz` on macOS, the AppImage and `.deb` on Linux, and the NSIS installer on Windows. With `uploadUpdaterJson`, each job merges its entries into the release's `latest.json`, retrying on conflicts: `darwin-aarch64`, `darwin-x86_64` and their `-app` variants all point at the universal archive, `linux-x86_64` at the AppImage, and `windows-x86_64` at the NSIS installer (`updaterJsonPreferNsis`). The URLs are GitHub API asset URLs, which the updater downloads with `Accept: application/octet-stream`. `notes` is the `releaseBody` the jobs pass. The `releases/latest` URL resolves once the draft is published.
 
 ### Signing
 
-The private updater key stays outside the repository; only its public key is in `tauri.conf.json`. The bundle is signed ad hoc (`signingIdentity` is `-`). It carries no Developer ID signature and is not notarized, so the first launch of a downloaded build needs the user to allow it in macOS. Minimum macOS version in the bundle is 10.15; the glass popup effect and layered icon need macOS 26.
+The private updater key stays outside the repository; only its public key is in `tauri.conf.json`. The bundle is signed ad hoc (`signingIdentity` is `-`). It carries no Developer ID signature and is not notarized, so the first launch of a downloaded build needs the user to allow it in macOS. Minimum macOS version in the bundle is 10.15; the glass popup effect and layered icon need macOS 26. The Windows installer is not code signed, so SmartScreen warns on its first run; `bundle.windows.signCommand` is where a signing service would plug in.

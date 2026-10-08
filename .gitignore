@@ -32,6 +32,5 @@ dist-ssr
 # Coverage output
 coverage
 
-# Generated SF Symbols (scripts/export-symbols.swift)
-src/assets/symbols/*.png
-src/assets/symbols/symbols.css
+# Generated icons (scripts/symbols.mjs)
+src/assets/symbols/
