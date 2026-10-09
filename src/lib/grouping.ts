@@ -14,10 +14,15 @@ export interface Section {
 }
 
 export interface OrgGroup {
+  /** The account and org the group lists; `null` for a section listed without headings. */
+  heading: OrgHeading | null;
+  repos: RepoSnapshot[];
+}
+
+export interface OrgHeading {
   account: AccountSnapshot;
   /** Org or namespace, the part of the full name before the last slash. */
   org: string;
-  repos: RepoSnapshot[];
 }
 
 const SECTION_ORDER: { id: SectionId; title: string; open: boolean; statuses: RepoStatus[] }[] = [
@@ -45,7 +50,39 @@ export function matchesFilter(repo: RepoSnapshot, filter: string): boolean {
   return haystack.includes(needle);
 }
 
-/** Splits repositories into the five sections, each grouped by account and then org. */
+/** Repository names in natural order: numbers by value, case ignored. */
+function byName(a: RepoSnapshot, b: RepoSnapshot): number {
+  return a.repo.full_name.localeCompare(b.repo.full_name, undefined, { numeric: true, sensitivity: "base" });
+}
+
+/** When the run a repo row shows last changed, in milliseconds; -Infinity without a run. */
+function runTime(repo: RepoSnapshot): number {
+  const updated = repo.state.representative?.updated_at;
+  const time = updated === undefined ? Number.NaN : Date.parse(updated);
+  return Number.isNaN(time) ? Number.NEGATIVE_INFINITY : time;
+}
+
+/** Orders `a` before `b` when its run is newer; 0 for the same time or when neither has a run. */
+function newerFirst(a: RepoSnapshot, b: RepoSnapshot): number {
+  const newer = runTime(b) - runTime(a);
+  return Number.isNaN(newer) ? 0 : newer;
+}
+
+/** Newest run first; repos without a run last; ties by name. */
+function byRecent(a: RepoSnapshot, b: RepoSnapshot): number {
+  return newerFirst(a, b) || byName(a, b);
+}
+
+function byHeading(a: OrgHeading, b: OrgHeading): number {
+  return a.account.label.localeCompare(b.account.label) || a.org.localeCompare(b.org);
+}
+
+/**
+ * Splits repositories into the five sections. Each section is grouped by account and then org,
+ * or lists its repositories in one group without a heading, as the snapshot asks. Repositories
+ * are sorted by name or by their newest run; with the newest run first, headings follow their
+ * newest repository.
+ */
 export function buildSections(snapshot: Snapshot, filter: string): Section[] {
   const accounts = new Map(snapshot.accounts.map((a) => [a.id, a]));
   const unknownAccount = (id: string): AccountSnapshot => ({
@@ -61,28 +98,32 @@ export function buildSections(snapshot: Snapshot, filter: string): Section[] {
     keychain_denied: false,
     error: null,
   });
+  const recent = snapshot.repo_order === "recent";
+  const compare = recent ? byRecent : byName;
 
   return SECTION_ORDER.map(({ id, title, open, statuses }) => {
     const repos = snapshot.repos.filter(
       (r) => statuses.includes(r.state.status) && matchesFilter(r, filter),
     );
-    const byKey = new Map<string, OrgGroup>();
+    if (!snapshot.group_by_org) {
+      const groups = repos.length === 0 ? [] : [{ heading: null, repos: repos.sort(compare) }];
+      return { id, title, open, groups, count: repos.length };
+    }
+    const byKey = new Map<string, { heading: OrgHeading; repos: RepoSnapshot[] }>();
     for (const repo of repos) {
       const account = accounts.get(repo.account_id) ?? unknownAccount(repo.account_id);
       const org = orgOf(repo.repo.full_name);
       const key = `${account.id}\u0000${org}`;
-      const group = byKey.get(key) ?? { account, org, repos: [] };
+      const group = byKey.get(key) ?? { heading: { account, org }, repos: [] };
       group.repos.push(repo);
       byKey.set(key, group);
     }
-    const groups = [...byKey.values()].sort(
-      (a, b) => a.account.label.localeCompare(b.account.label) || a.org.localeCompare(b.org),
-    );
+    const groups = [...byKey.values()];
     for (const group of groups) {
-      group.repos.sort((a, b) =>
-        a.repo.full_name.localeCompare(b.repo.full_name, undefined, { numeric: true, sensitivity: "base" }),
-      );
+      group.repos.sort(compare);
     }
+    // Each group's repos are sorted, so its first repo has its newest run.
+    groups.sort((a, b) => (recent ? newerFirst(a.repos[0], b.repos[0]) : 0) || byHeading(a.heading, b.heading));
     return { id, title, open, groups, count: repos.length };
   });
 }

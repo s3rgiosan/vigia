@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use vigia_lib::app::Runtime;
 use vigia_lib::config::{
-    Account, AccountKind, Config, ConfigStore, FilterSet, OrgFilters, Settings, WatchedRepo,
+    Account, AccountKind, Config, ConfigStore, FilterSet, OrgFilters, RepoOrder, Settings,
+    WatchedRepo,
 };
 use vigia_lib::notes;
 use vigia_lib::providers::RepoInfo;
@@ -525,6 +526,29 @@ async fn update_checks_round_trip_through_update_settings_and_the_settings_view(
         let json = serde_json::to_value(vigia_lib::commands::settings_view(&runtime)).unwrap();
         assert_eq!(json["settings"]["check_for_updates"], enabled);
     }
+}
+
+#[tokio::test]
+async fn repo_list_layout_reaches_the_snapshot() {
+    let runtime = runtime_with(Config::default());
+    let snapshot = runtime.snapshot();
+    assert_eq!(snapshot.repo_order, RepoOrder::Name);
+    assert!(snapshot.group_by_org);
+    update_settings(
+        &runtime,
+        Settings {
+            repo_order: RepoOrder::Recent,
+            group_by_org: false,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let snapshot = runtime.snapshot();
+    assert_eq!(snapshot.repo_order, RepoOrder::Recent);
+    assert!(!snapshot.group_by_org);
+    let json = serde_json::to_value(&snapshot).unwrap();
+    assert_eq!(json["repo_order"], "recent");
+    assert_eq!(json["group_by_org"], false);
 }
 
 #[tokio::test]

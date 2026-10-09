@@ -50,7 +50,9 @@ export function isSnapshot(value: unknown): value is Snapshot {
     typeof value.tooltip === "string" &&
     isArrayOf(value.accounts, isAccountSnapshot) &&
     isArrayOf(value.repos, isRepoSnapshot) &&
-    (value.update === null || isUpdateInfo(value.update))
+    (value.update === null || isUpdateInfo(value.update)) &&
+    (value.repo_order === "name" || value.repo_order === "recent") &&
+    typeof value.group_by_org === "boolean"
   );
 }
 

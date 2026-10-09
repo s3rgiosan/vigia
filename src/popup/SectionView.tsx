@@ -5,7 +5,7 @@ import type { Section } from "../lib/grouping";
 import type { AccountSnapshot } from "../lib/snapshot";
 import { RepoRow } from "./RepoRow";
 
-/** A collapsible status section whose repositories are grouped by account and owner. */
+/** A collapsible status section whose repositories are grouped by account and owner, or listed under no heading. */
 export function SectionView({
   section,
   now,
@@ -48,15 +48,18 @@ export function SectionView({
         <span className="section__count numeric">{section.count}</span>
       </button>
       {expanded
-        ? section.groups.map((group) => (
-            <div className="group" key={`${group.account.id}-${group.org}`}>
-              <div className="group__title">{showAccount ? `${group.account.label} · ${group.org}` : group.org}</div>
-              {group.repos.map((repo) => (
+        ? section.groups.map(({ heading, repos }) => (
+            <div className="group" key={heading ? `${heading.account.id}-${heading.org}` : "all"}>
+              {heading ? (
+                <div className="group__title">{showAccount ? `${heading.account.label} · ${heading.org}` : heading.org}</div>
+              ) : null}
+              {repos.map((repo) => (
                 <RepoRow
                   key={`${repo.account_id}-${repo.repo.id}`}
                   repo={repo}
                   now={now}
                   isGitHub={(accounts.get(repo.account_id)?.kind ?? "github") === "github"}
+                  showOwner={heading === null}
                   onError={onError}
                   onStopped={onStopped}
                 />

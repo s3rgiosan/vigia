@@ -1182,6 +1182,7 @@ fn snapshot_store_sorts_by_name_and_carries_flags() {
             config_read_only: true,
             config_error: Some("broken".into()),
             update: None,
+            ..Default::default()
         },
     );
     let labels: Vec<&str> = snapshot.accounts.iter().map(|a| a.label.as_str()).collect();

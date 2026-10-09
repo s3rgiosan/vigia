@@ -67,6 +67,25 @@ describe("general settings", () => {
     ]);
   });
 
+  it("saves the repository order and grouping", () => {
+    const save = renderTab();
+    const order = screen.getByLabelText("Sort repositories by") as HTMLSelectElement;
+    expect(Array.from(order.options).map((o) => o.textContent)).toEqual(["Name", "Most recent run"]);
+    fireEvent.change(order, { target: { value: "recent" } });
+    fireEvent.click(screen.getByLabelText("Group repositories by organization"));
+    expect(save.mock.calls).toEqual([[{ repo_order: "recent" }], [{ group_by_org: false }]]);
+  });
+
+  it("shows the stored repository layout and locks it while read-only", () => {
+    renderTab({ repo_order: "recent", group_by_org: false }, true);
+    const order = screen.getByLabelText("Sort repositories by") as HTMLSelectElement;
+    const group = screen.getByLabelText("Group repositories by organization") as HTMLInputElement;
+    expect(order.value).toBe("recent");
+    expect(group.checked).toBe(false);
+    expect(order.disabled).toBe(true);
+    expect(group.disabled).toBe(true);
+  });
+
   it("saves the automatic update switch", () => {
     const save = renderTab();
     fireEvent.click(screen.getByLabelText("Check for updates automatically"));

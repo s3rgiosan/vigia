@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { FormRow, FormSection, Toggle } from "../components/Form";
 import { PopUpButton } from "../components/PopUpButton";
 import { useInstallUpdate } from "../lib/hooks/useInstallUpdate";
-import type { UpdateInfo } from "../lib/snapshot";
+import type { RepoOrder, UpdateInfo } from "../lib/snapshot";
 import { checkForUpdatesNow } from "../lib/tauri";
 import { useSettings } from "./SettingsContext";
 
@@ -14,6 +14,11 @@ const INTERVALS: { secs: number; label: string }[] = [
   { secs: 120, label: "2 minutes" },
   { secs: 300, label: "5 minutes" },
   { secs: 600, label: "10 minutes" },
+];
+
+const ORDERS: { value: RepoOrder; label: string }[] = [
+  { value: "name", label: "Name" },
+  { value: "recent", label: "Most recent run" },
 ];
 
 export function GeneralTab() {
@@ -50,6 +55,27 @@ export function GeneralTab() {
             label="Ignore pull request runs"
             checked={s.exclude_pull_requests}
             onChange={(v) => save({ exclude_pull_requests: v })}
+            disabled={locked}
+          />
+        </FormRow>
+      </FormSection>
+
+      <FormSection title="Repository list" footer="Status sections stay in place; the order applies within each one.">
+        <FormRow label="Sort by" htmlFor="repo-order">
+          <PopUpButton
+            id="repo-order"
+            label="Sort repositories by"
+            value={s.repo_order}
+            onChange={(order) => save({ repo_order: order })}
+            disabled={locked}
+            options={ORDERS}
+          />
+        </FormRow>
+        <FormRow label="Group by organization">
+          <Toggle
+            label="Group repositories by organization"
+            checked={s.group_by_org}
+            onChange={(v) => save({ group_by_org: v })}
             disabled={locked}
           />
         </FormRow>

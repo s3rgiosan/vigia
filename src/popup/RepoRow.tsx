@@ -12,6 +12,8 @@ interface RepoRowProps {
   repo: RepoSnapshot;
   now: Date;
   isGitHub: boolean;
+  /** Names the repo as `owner/name`, for rows without an organization heading above them. */
+  showOwner: boolean;
   onError: (e: unknown) => void;
   onStopped: (stopped: StoppedRepo) => void;
 }
@@ -32,13 +34,13 @@ function colorOf(repo: RepoSnapshot): TrayColor {
 }
 
 /** One repository line, expandable to its workflow runs. */
-export const RepoRow = memo(function RepoRow({ repo, now, isGitHub, onError, onStopped }: RepoRowProps) {
+export const RepoRow = memo(function RepoRow({ repo, now, isGitHub, showOwner, onError, onStopped }: RepoRowProps) {
   const [expanded, setExpanded] = useState(false);
   const repoRowRef = useRef<HTMLButtonElement>(null);
   const runs = useMemo(() => sortRuns(repo.state.groups), [repo.state.groups]);
   const run = repo.state.representative;
   const url = run?.url ?? ciPage(repo, isGitHub);
-  const name = repo.repo.full_name.slice(repo.repo.full_name.lastIndexOf("/") + 1);
+  const name = showOwner ? repo.repo.full_name : repo.repo.full_name.slice(repo.repo.full_name.lastIndexOf("/") + 1);
   const samlHint = isGitHub && repo.state.note === NO_ACCESS_NOTE;
   const expandable = runs.length > 1 || samlHint;
   const color = colorOf(repo);

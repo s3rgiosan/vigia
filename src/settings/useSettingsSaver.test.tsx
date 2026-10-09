@@ -20,6 +20,8 @@ const base: Settings = {
   notify_recoveries: true,
   launch_at_login: false,
   check_for_updates: true,
+  repo_order: "name",
+  group_by_org: true,
 };
 
 beforeEach(() => {

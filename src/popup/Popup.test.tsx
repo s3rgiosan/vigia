@@ -248,6 +248,13 @@ describe("Popup content", () => {
     expect(screen.getByText("Example · example")).toBeTruthy();
   });
 
+  it("lists repos without organization headings by their full name when grouping is off", async () => {
+    await mount(snapshot({ group_by_org: false }));
+    expect(document.querySelector(".group__title")).toBeNull();
+    const names = repoRows().map((row) => row.querySelector(".row__name")?.textContent);
+    expect(names).toEqual(["acme/api", "acme/web"]);
+  });
+
   it("shows the no-repositories state with a link to the repos pane", async () => {
     await mount(snapshot({ repos: [], color: "gray" }));
     expect(screen.getByText("No repositories")).toBeTruthy();

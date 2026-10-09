@@ -11,7 +11,7 @@ use tokio::task::JoinSet;
 
 use crate::aggregate::{overall, repo_state, select_groups, Selection};
 use crate::config::{
-    Account, AccountKind, OrgFilters, Settings, WatchedRepo, MIN_POLL_INTERVAL_SECS,
+    Account, AccountKind, OrgFilters, RepoOrder, Settings, WatchedRepo, MIN_POLL_INTERVAL_SECS,
 };
 use crate::filters::{selection_changed, FilterCompiler, FilterScope, RepoFilters};
 use crate::model::{RepoState, RepoStatus, RunState, TrayColor};
@@ -120,6 +120,8 @@ pub struct Snapshot {
     pub tooltip: String,
     pub accounts: Vec<AccountSnapshot>,
     pub repos: Vec<RepoSnapshot>,
+    pub repo_order: RepoOrder,
+    pub group_by_org: bool,
 }
 
 impl Snapshot {
@@ -136,17 +138,34 @@ impl Snapshot {
             tooltip: o.tooltip(),
             accounts: Vec::new(),
             repos: Vec::new(),
+            repo_order: RepoOrder::Name,
+            group_by_org: true,
         }
     }
 }
 
 /// App-level flags carried on every snapshot.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SnapshotFlags {
     pub secrets_blocked: bool,
     pub config_read_only: bool,
     pub config_error: Option<String>,
     pub update: Option<UpdateInfo>,
+    pub repo_order: RepoOrder,
+    pub group_by_org: bool,
+}
+
+impl Default for SnapshotFlags {
+    fn default() -> SnapshotFlags {
+        SnapshotFlags {
+            secrets_blocked: false,
+            config_read_only: false,
+            config_error: None,
+            update: None,
+            repo_order: RepoOrder::Name,
+            group_by_org: true,
+        }
+    }
 }
 
 /// Accumulates account and repo states and builds snapshots.
@@ -254,6 +273,8 @@ impl SnapshotStore {
             tooltip: o.tooltip(),
             accounts,
             repos: repos_with_stale,
+            repo_order: flags.repo_order,
+            group_by_org: flags.group_by_org,
         }
     }
 }
