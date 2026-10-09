@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-10
+
+### Added
+
+- The General pane sorts the popup’s repositories by name or by most recent run, and lists them grouped by organization or as one list per status section.
+
 ## [1.1.1] - 2026-10-08
 
 ### Fixed
@@ -30,7 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release.
 
-[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.1.1...HEAD
+[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/s3rgiosan/vigia/compare/1.1.1...1.2.0
 [1.1.1]: https://github.com/s3rgiosan/vigia/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/s3rgiosan/vigia/compare/1.0.0...1.1.0
 [1.0.0]: https://github.com/s3rgiosan/vigia/releases/tag/1.0.0

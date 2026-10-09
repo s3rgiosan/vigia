@@ -136,6 +136,8 @@ function buildSnapshot(paused: boolean, scenario: string): Snapshot {
     accounts: scenario === "empty" ? [] : accounts,
     repos: scenario === "empty" ? [] : repos,
     update: scenario === "update" ? AVAILABLE_UPDATE : null,
+    repo_order: "name",
+    group_by_org: true,
   };
 }
 
@@ -163,7 +165,8 @@ function pickerRepos(many: boolean): PickerRepo[] {
 
 export function install() {
   Object.defineProperty(window, "__VIGIA_PREVIEW__", { value: true });
-  const scenario = new URLSearchParams(window.location.search).get("scenario") ?? "default";
+  const params = new URLSearchParams(window.location.search);
+  const scenario = params.get("scenario") ?? "default";
   let paused = false;
   // One organization ignores no workflows, overriding the global Dependabot* pattern.
   const orgFilters = new Map<string, OrgFilters>([[orgKey("github.com", "acme"), { ...NO_FILTERS, ignored_workflows: [] }]]);
@@ -181,6 +184,8 @@ export function install() {
       notify_recoveries: false,
       launch_at_login: false,
       check_for_updates: true,
+      repo_order: params.get("order") === "recent" ? "recent" : "name",
+      group_by_org: params.get("group") !== "none",
     },
     read_only: false,
     secrets_blocked: scenario === "keychain",
@@ -202,7 +207,11 @@ export function install() {
       const a = (args ?? {}) as Record<string, unknown>;
       switch (cmd) {
         case "get_snapshot":
-          return buildSnapshot(paused, scenario);
+          return {
+            ...buildSnapshot(paused, scenario),
+            repo_order: settings.settings.repo_order,
+            group_by_org: settings.settings.group_by_org,
+          };
         case "set_paused":
           paused = Boolean(a.paused);
           return null;

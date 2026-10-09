@@ -172,6 +172,17 @@ pub struct WatchedRepo {
     pub include_tags: Option<bool>,
 }
 
+/// How the popup orders repositories within each status section.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RepoOrder {
+    /// By organization, then repository name.
+    #[default]
+    Name,
+    /// Newest run first.
+    Recent,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -189,6 +200,10 @@ pub struct Settings {
     /// Checks GitHub for a newer release a minute after launch and once a day.
     #[serde(default = "default_true")]
     pub check_for_updates: bool,
+    pub repo_order: RepoOrder,
+    /// Whether the popup lists repositories under account and organization headings.
+    #[serde(default = "default_true")]
+    pub group_by_org: bool,
 }
 
 fn default_true() -> bool {
@@ -207,6 +222,8 @@ impl Default for Settings {
             notify_recoveries: false,
             launch_at_login: false,
             check_for_updates: true,
+            repo_order: RepoOrder::Name,
+            group_by_org: true,
         }
     }
 }
@@ -623,6 +640,25 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(settings.poll_interval_secs(), MAX_POLL_INTERVAL_SECS);
+    }
+
+    #[test]
+    fn repo_list_layout_defaults_to_name_order_grouped_by_organization() {
+        let (_dir, path) = temp_path();
+        fs::write(&path, r#"{"schema_version": 1, "settings": {}}"#).unwrap();
+        let store = ConfigStore::load(&path).unwrap();
+        assert_eq!(store.config().settings.repo_order, RepoOrder::Name);
+        assert!(store.config().settings.group_by_org);
+        assert_eq!(Settings::default().repo_order, RepoOrder::Name);
+        assert!(Settings::default().group_by_org);
+    }
+
+    #[test]
+    fn repo_order_serializes_as_snake_case() {
+        assert_eq!(serde_json::to_value(RepoOrder::Name).unwrap(), "name");
+        assert_eq!(serde_json::to_value(RepoOrder::Recent).unwrap(), "recent");
+        let recent: RepoOrder = serde_json::from_str(r#""recent""#).unwrap();
+        assert_eq!(recent, RepoOrder::Recent);
     }
 
     #[test]

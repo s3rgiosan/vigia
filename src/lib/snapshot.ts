@@ -67,6 +67,9 @@ export interface UpdateInfo {
   notes: string | null;
 }
 
+/** How the popup orders repositories within a status section. */
+export type RepoOrder = "name" | "recent";
+
 export interface Snapshot {
   generated_at: string;
   paused: boolean;
@@ -80,6 +83,9 @@ export interface Snapshot {
   repos: RepoSnapshot[];
   /** The release waiting to be installed, if one was found. */
   update: UpdateInfo | null;
+  repo_order: RepoOrder;
+  /** Whether repositories are listed under account and organization headings. */
+  group_by_org: boolean;
 }
 
 export const SNAPSHOT_EVENT = "snapshot-updated";

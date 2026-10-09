@@ -76,6 +76,8 @@ export function makeSnapshot(overrides: Partial<Snapshot> = {}): Snapshot {
     accounts: [],
     repos: [],
     update: null,
+    repo_order: "name",
+    group_by_org: true,
     ...overrides,
   };
 }
@@ -91,6 +93,8 @@ export function makeSettings(overrides: Partial<Settings> = {}): Settings {
     notify_recoveries: true,
     launch_at_login: false,
     check_for_updates: true,
+    repo_order: "name",
+    group_by_org: true,
     ...overrides,
   };
 }

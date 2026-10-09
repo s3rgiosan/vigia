@@ -28,8 +28,17 @@ function repo(accountId: string, fullName: string, status: RepoStatus, rep: Run 
   return { ...built, repo: { ...built.repo, id: fullName.length } };
 }
 
-function snapshot(accounts: AccountSnapshot[], repos: RepoSnapshot[]): Snapshot {
-  return makeSnapshot({ generated_at: "2026-06-01T12:00:00Z", accounts, repos });
+function snapshot(accounts: AccountSnapshot[], repos: RepoSnapshot[], extra: Partial<Snapshot> = {}): Snapshot {
+  return makeSnapshot({ generated_at: "2026-06-01T12:00:00Z", accounts, repos, ...extra });
+}
+
+/** A run that last changed at `time` on 2026-06-01. */
+function runAt(time: string): Run {
+  return makeRun({ branch: "main", name: "CI", group: "ci", updated_at: `2026-06-01T${time}Z` });
+}
+
+function names(group: { repos: RepoSnapshot[] }): string[] {
+  return group.repos.map((r) => r.repo.full_name);
 }
 
 describe("orgOf", () => {
@@ -62,7 +71,7 @@ describe("buildSections", () => {
     expect(sections.map((x) => x.open)).toEqual([true, true, true, false, false]);
 
     const failed = sections[0];
-    expect(failed.groups.map((g) => `${g.account.label}/${g.org}`)).toEqual(["Home/me", "Work/acme"]);
+    expect(failed.groups.map((g) => `${g.heading?.account.label}/${g.heading?.org}`)).toEqual(["Home/me", "Work/acme"]);
     expect(failed.groups[1].repos.map((r) => r.repo.full_name)).toEqual(["acme/a", "acme/z"]);
   });
 
@@ -81,7 +90,7 @@ describe("buildSections", () => {
   it("tolerates a repo whose account is missing", () => {
     const s = snapshot([], [repo("ghost", "x/y", "none")]);
     const none = buildSections(s, "")[4];
-    expect(none.groups[0].account.label).toBe("Unknown account");
+    expect(none.groups[0].heading?.account.label).toBe("Unknown account");
   });
 });
 
@@ -320,13 +329,69 @@ describe("matchesFilter without a representative run", () => {
   });
 });
 
+describe("buildSections with the most recent run first", () => {
+  it("orders repos and their headings by their newest run, with no-run repos last", () => {
+    const s = snapshot(
+      [account("a", "Work"), account("b", "Home")],
+      [
+        repo("a", "acme/old", "failed", runAt("09:00:00")),
+        repo("a", "acme/new", "failed", runAt("11:30:00")),
+        repo("a", "acme/never", "failed"),
+        repo("b", "me/mid", "failed", runAt("10:00:00")),
+        repo("a", "zeta/latest", "failed", runAt("11:45:00")),
+      ],
+      { repo_order: "recent" },
+    );
+    const failed = buildSections(s, "")[0];
+    expect(failed.groups.map((g) => g.heading?.org)).toEqual(["zeta", "acme", "me"]);
+    expect(names(failed.groups[1])).toEqual(["acme/new", "acme/old", "acme/never"]);
+  });
+
+  it("falls back to name order for runs at the same time", () => {
+    const s = snapshot(
+      [account("a", "Work")],
+      [repo("a", "acme/b", "failed", runAt("10:00:00")), repo("a", "acme/a", "failed", runAt("10:00:00"))],
+      { repo_order: "recent" },
+    );
+    expect(names(buildSections(s, "")[0].groups[0])).toEqual(["acme/a", "acme/b"]);
+  });
+});
+
+describe("buildSections without organization headings", () => {
+  const repos = [
+    repo("a", "zeta/one", "failed", runAt("09:00:00")),
+    repo("b", "me/two", "failed", runAt("11:00:00")),
+    repo("a", "acme/three", "failed"),
+    repo("a", "acme/ok", "success", runAt("08:00:00")),
+  ];
+  const accounts = [account("a", "Work"), account("b", "Home")];
+
+  it("lists each section as one group without a heading, by full name", () => {
+    const sections = buildSections(snapshot(accounts, repos, { group_by_org: false }), "");
+    expect(sections[0].groups).toHaveLength(1);
+    expect(sections[0].groups[0].heading).toBeNull();
+    expect(names(sections[0].groups[0])).toEqual(["acme/three", "me/two", "zeta/one"]);
+    expect(names(sections[3].groups[0])).toEqual(["acme/ok"]);
+  });
+
+  it("lists each section newest run first", () => {
+    const s = snapshot(accounts, repos, { group_by_org: false, repo_order: "recent" });
+    expect(names(buildSections(s, "")[0].groups[0])).toEqual(["me/two", "zeta/one", "acme/three"]);
+  });
+
+  it("has no group for an empty section", () => {
+    const sections = buildSections(snapshot(accounts, repos, { group_by_org: false }), "");
+    expect(sections[1].groups).toEqual([]);
+  });
+});
+
 describe("buildSections ordering", () => {
   it("orders organisations of one account alphabetically", () => {
     const s = snapshot(
       [account("a", "Work")],
       [repo("a", "zeta/one", "failed"), repo("a", "acme/two", "failed")],
     );
-    const orgs = buildSections(s, "")[0].groups.map((g) => g.org);
+    const orgs = buildSections(s, "")[0].groups.map((g) => g.heading?.org);
     expect(orgs).toEqual(["acme", "zeta"]);
   });
 

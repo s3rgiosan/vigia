@@ -3,7 +3,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { isSettingsView, isSnapshot } from "./guards";
-import { SNAPSHOT_EVENT, type AccountKind, type RepoInfo, type Snapshot, type UpdateInfo } from "./snapshot";
+import { SNAPSHOT_EVENT, type AccountKind, type RepoInfo, type RepoOrder, type Snapshot, type UpdateInfo } from "./snapshot";
 
 export const SETTINGS_PANE_EVENT = "settings-pane";
 
@@ -63,6 +63,9 @@ export interface Settings {
   launch_at_login: boolean;
   /** Whether Vigia looks for a new release a minute after launch and daily. */
   check_for_updates: boolean;
+  repo_order: RepoOrder;
+  /** Whether the popup lists repositories under account and organization headings. */
+  group_by_org: boolean;
 }
 
 export interface SettingsView {

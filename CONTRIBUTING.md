@@ -72,6 +72,8 @@ Add `&scenario=` with one of these values to preview a state:
 - `many`: a long repository picker.
 - `update`: an available update.
 
+Add `&order=recent` to sort the popup newest run first, and `&group=none` to list it without organization headings.
+
 ## Probe example
 
 The probe checks one real repository without the app. `VIGIA_INCLUDE_TAGS=1` counts tag runs.

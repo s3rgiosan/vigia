@@ -247,6 +247,8 @@ impl Runtime {
             config_read_only: config.read_only(),
             config_error: config.load_error().map(str::to_string),
             update,
+            repo_order: config.config().settings.repo_order,
+            group_by_org: config.config().settings.group_by_org,
         });
         self.store
             .snapshot(self.now(), self.controls.is_paused(), flags)
@@ -269,6 +271,8 @@ impl Runtime {
                     config_read_only: snapshot.config_read_only,
                     config_error: snapshot.config_error.clone(),
                     update: snapshot.update.clone(),
+                    repo_order: snapshot.repo_order,
+                    group_by_org: snapshot.group_by_org,
                 },
             };
             if state.last.as_ref() == Some(&key) {
