@@ -209,6 +209,11 @@ button.icon:disabled {
   opacity: 0.4;
 }
 
+/* A busy button is disabled but keeps full strength, so its progress stays visible. */
+button.icon[aria-busy="true"]:disabled {
+  opacity: 1;
+}
+
 .symbol {
   display: inline-block;
   flex: none;
@@ -367,7 +372,12 @@ textarea:focus-visible {
   font-size: 13px;
 }
 
-.segmented__item--on {
+.segmented__item:active {
+  background: var(--control-fill);
+}
+
+.segmented__item--on,
+.segmented__item--on:active {
   background: var(--control-fill-strong);
 }
 
@@ -581,6 +591,18 @@ button.link:hover {
 @keyframes pulse {
   50% {
     opacity: 0.35;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
   }
 }
 

@@ -40,6 +40,10 @@
   font-size: 11px;
 }
 
+.toolbar__tab:active {
+  background: var(--control-fill-strong);
+}
+
 .toolbar__tab--active {
   color: var(--label);
 }
@@ -499,14 +503,25 @@ code {
   white-space: nowrap;
 }
 
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
+/* A closing sheet leaves the way it came, on the mirror of the opening curve. */
+.sheet-backdrop--closing {
+  pointer-events: none;
+  animation: fade-out 150ms ease-in forwards;
+}
+
+.sheet-backdrop--closing .sheet {
+  animation: sheet-out 150ms cubic-bezier(0.7, 0, 0.8, 0.1) forwards;
 }
 
 @keyframes sheet-in {
   from {
+    transform: translateY(-14px);
+    opacity: 0;
+  }
+}
+
+@keyframes sheet-out {
+  to {
     transform: translateY(-14px);
     opacity: 0;
   }
@@ -661,10 +676,22 @@ code {
   }
 }
 
+/* Reduce Motion: sheets cross-fade in place. */
 @media (prefers-reduced-motion: reduce) {
-  .sheet,
+  .sheet {
+    animation: fade-in 120ms ease-out;
+  }
+
+  .sheet-backdrop--closing .sheet {
+    animation: fade-out 120ms ease-in forwards;
+  }
+
   .sheet-backdrop {
-    animation: none;
+    animation-duration: 120ms;
+  }
+
+  .sheet-backdrop--closing {
+    animation-duration: 120ms;
   }
 
   .spinner {

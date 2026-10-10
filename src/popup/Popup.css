@@ -110,6 +110,10 @@
   margin-top: 1px;
 }
 
+.popup__banners .banner {
+  animation: fade-in 150ms ease-out;
+}
+
 .banner__text {
   flex: 1;
 }
@@ -177,6 +181,11 @@
   color: var(--label);
 }
 
+.section__header:active {
+  background: var(--fill);
+  color: var(--label);
+}
+
 .section__count {
   margin-left: auto;
   color: var(--label-secondary);
@@ -211,6 +220,12 @@
   background: var(--fill);
 }
 
+/* Pressing a row darkens it at once, before the click opens the page. */
+.repo__line:has(.row:active) {
+  background: var(--fill-strong);
+  transition: none;
+}
+
 .repo__line:has(.row:focus-visible) {
   background: var(--accent);
   color: var(--accent-text);
@@ -237,6 +252,11 @@
 
 .run:hover {
   background: var(--fill);
+}
+
+.run:active {
+  background: var(--fill-strong);
+  transition: none;
 }
 
 .run:focus-visible,
@@ -390,6 +410,63 @@ button.row__disclosure:focus-visible {
   font-size: 12px;
 }
 
+/*
+ * Scroll edges: where the list has more content above or below, it fades out over 16 px. The
+ * fade grows over the first and last 16 px of scrolling and is absent when nothing scrolls, so
+ * the footer needs no separator. Engines without scroll-driven animations keep the separator.
+ */
+@property --edge-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@property --edge-bottom {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+@keyframes edge-top {
+  to {
+    --edge-top: 16px;
+  }
+}
+
+@keyframes edge-bottom {
+  from {
+    --edge-bottom: 16px;
+  }
+}
+
+@supports (animation-timeline: scroll()) {
+  .popup__list {
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--edge-top),
+      #000 calc(100% - var(--edge-bottom)),
+      transparent
+    );
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 var(--edge-top),
+      #000 calc(100% - var(--edge-bottom)),
+      transparent
+    );
+    /* Rows scrolled into view stop clear of the fade. */
+    scroll-padding-block: 16px;
+    animation: edge-top linear both, edge-bottom linear both;
+    animation-timeline: scroll(self), scroll(self);
+    animation-range: 0 16px, calc(100% - 16px) 100%;
+  }
+
+  .popup__footer {
+    border-top: 0;
+  }
+}
+
 /* Empty state ------------------------------------------------------------- */
 
 .popup--empty {
@@ -434,9 +511,18 @@ button.row__disclosure:focus-visible {
   line-height: 1.4;
 }
 
-/* The panel eases in each time it opens, like system menu bar panels. */
+/*
+ * The panel eases in each time it opens, like system menu bar panels, growing out of the edge
+ * that meets the tray icon: the top, or the bottom where the popup opens above the taskbar.
+ */
 .popup--opening {
+  transform-origin: top center;
   animation: panel-in 160ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.popup--above.popup--opening {
+  transform-origin: bottom center;
+  animation-name: panel-in-above;
 }
 
 @keyframes panel-in {
@@ -446,9 +532,18 @@ button.row__disclosure:focus-visible {
   }
 }
 
+@keyframes panel-in-above {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.985);
+  }
+}
+
+/* Reduce Motion: the panel fades in, and a busy refresh pulses where it would spin. */
 @media (prefers-reduced-motion: reduce) {
-  .popup--opening {
-    animation: none;
+  .popup--opening,
+  .popup--above.popup--opening {
+    animation: fade-in 120ms ease-out;
   }
 
   .row,
@@ -461,6 +556,6 @@ button.row__disclosure:focus-visible {
 
   .icon--spinning .symbol,
   .icon--spinning svg {
-    animation: none;
+    animation: pulse 1.6s ease-in-out infinite;
   }
 }

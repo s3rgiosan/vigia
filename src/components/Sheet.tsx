@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useId, useRef, type MutableRefObject, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useId, useLayoutEffect, useRef, type MutableRefObject, type ReactNode } from "react";
 import { useLatest } from "../lib/hooks/useLatest";
 import { isPreview } from "../lib/preview";
 import { setSettingsToolbarEnabled } from "../lib/tauri";
@@ -14,6 +14,9 @@ export const OpenSheetsContext = createContext<MutableRefObject<number> | null>(
 const FIT_STYLE = { width: "max-content", minWidth: 440, maxWidth: "calc(100vw - 48px)" };
 
 const FOCUSABLE = 'input, select, textarea, button, a[href], [tabindex]:not([tabindex="-1"])';
+
+/** Removes the exit copy if its animation never reports an end. */
+const EXIT_FALLBACK_MS = 400;
 
 function setToolbarEnabled(enabled: boolean) {
   if (isPreview()) {
@@ -46,6 +49,30 @@ function makeOthersInert(keep: HTMLElement): () => void {
   };
 }
 
+/**
+ * Plays the exit animation on an inert copy of a sheet that React just removed, put back where
+ * the sheet was. The copy goes once the animation ends, or at once when the styles give it none.
+ * Nothing plays when the sheet is still attached, as in StrictMode's simulated unmount.
+ */
+function playExit(node: HTMLElement, parent: HTMLElement, next: Node | null) {
+  if (node.isConnected || !parent.isConnected) {
+    return;
+  }
+  const ghost = node.cloneNode(true) as HTMLElement;
+  ghost.classList.add("sheet-backdrop--closing");
+  ghost.setAttribute("inert", "");
+  ghost.setAttribute("aria-hidden", "true");
+  const anchor = next?.parentNode === parent ? next : null;
+  parent.insertBefore(ghost, anchor);
+  const animation = getComputedStyle(ghost).animationName;
+  if (!animation || animation === "none") {
+    ghost.remove();
+    return;
+  }
+  ghost.addEventListener("animationend", () => ghost.remove(), { once: true });
+  window.setTimeout(() => ghost.remove(), EXIT_FALLBACK_MS);
+}
+
 /** A note under a sheet's fields: label-coloured text after a red (error) or orange (warning) symbol. */
 export function SheetNote({ tone = "error", children }: { tone?: "error" | "warning"; children: ReactNode }) {
   return (
@@ -57,7 +84,8 @@ export function SheetNote({ tone = "error", children }: { tone?: "error" | "warn
 }
 
 /**
- * A window-modal sheet that slides down from the top of the window, like macOS sheets. Esc
+ * A window-modal sheet that slides down from the top of the window and back up when it closes,
+ * like macOS sheets. Esc
  * cancels (unless busy), Return activates the default button, and Tab cycles within the sheet.
  * The rest of the window is inert while it shows, and focus returns to where it was when it
  * closes. On a destructive sheet Cancel is the default button and takes initial focus, so Return
@@ -118,6 +146,18 @@ export function Sheet({
       }
     };
   }, [openSheets]);
+
+  // React removes the sheet right after this cleanup, so the exit plays once the commit is done.
+  useLayoutEffect(() => {
+    const node = backdrop.current;
+    return () => {
+      const parent = node?.parentElement;
+      if (node && parent) {
+        const next = node.nextSibling;
+        queueMicrotask(() => playExit(node, parent, next));
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;

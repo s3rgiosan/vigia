@@ -5,6 +5,9 @@ const PLATFORM: string = import.meta.env.TAURI_ENV_PLATFORM ?? "darwin";
 /** Whether this build runs on macOS, where Settings has a native toolbar. */
 export const IS_MACOS = PLATFORM === "darwin";
 
+/** Whether the popup opens above the tray icon, as on Windows, where the taskbar usually sits at the bottom. */
+export const POPUP_ABOVE_TRAY = PLATFORM === "windows";
+
 /** How the OS names the store that holds Vigia's tokens, and what to say when it refuses access. */
 export interface SecretStoreNames {
   /** The store, as it reads after "the": "Keychain". */

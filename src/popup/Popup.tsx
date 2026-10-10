@@ -4,7 +4,7 @@ import type { StoppedRepo } from "../lib/contextMenu";
 import { friendlyError } from "../lib/errors";
 import { buildBanners, buildSections, formatInterval, relativeTime, summarize } from "../lib/grouping";
 import { useDocumentVisible } from "../lib/hooks/useDocumentVisible";
-import { IS_MACOS } from "../lib/platform";
+import { IS_MACOS, POPUP_ABOVE_TRAY } from "../lib/platform";
 import type { Snapshot, UpdateInfo } from "../lib/snapshot";
 import {
   getSnapshot,
@@ -45,7 +45,9 @@ const TICK_MS = 30_000;
 /** Selector for every keyboard-navigable row, in document order. */
 const NAV = "[data-nav]";
 
-const PANEL_CLASS = IS_MACOS ? "popup" : "popup popup--opaque";
+const PANEL_CLASS = ["popup", IS_MACOS ? "" : "popup--opaque", POPUP_ABOVE_TRAY ? "popup--above" : ""]
+  .filter(Boolean)
+  .join(" ");
 
 export function Popup() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -254,7 +256,10 @@ export function Popup() {
   return (
     <main className={PANEL_CLASS} ref={panelRef} onKeyDown={onListKey}>
       <header className="popup__header">
-        <span className={`dot dot--lg dot--${snapshot.color}`} aria-hidden="true" />
+        <span
+          className={`dot dot--lg dot--${snapshot.color} ${snapshot.color === "yellow" ? "dot--pulse" : ""}`}
+          aria-hidden="true"
+        />
         <div className="popup__title" aria-live="polite">
           <strong className="numeric">{summary.headline}</strong>
           {summary.detail ? <span className="numeric">{summary.detail}</span> : null}

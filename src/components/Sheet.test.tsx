@@ -289,6 +289,71 @@ describe("Sheet modality", () => {
   });
 });
 
+function Toggle() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div>
+      {open ? <Sheet title="Closing" submitLabel="Go" onCancel={() => setOpen(false)} onSubmit={() => undefined} /> : null}
+    </div>
+  );
+}
+
+describe("sheet exit", () => {
+  function animated(name: string) {
+    const real = window.getComputedStyle;
+    return vi.spyOn(window, "getComputedStyle").mockImplementation((el, pseudo) => {
+      const style = real(el, pseudo);
+      return { ...style, animationName: name } as CSSStyleDeclaration;
+    });
+  }
+
+  it("plays the exit on an inert copy and removes it when the animation ends", async () => {
+    const style = animated("sheet-out");
+    render(<Toggle />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await act(async () => undefined);
+    const ghost = document.querySelector<HTMLElement>(".sheet-backdrop--closing");
+    expect(ghost).not.toBeNull();
+    expect(ghost?.hasAttribute("inert")).toBe(true);
+    expect(ghost?.getAttribute("aria-hidden")).toBe("true");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    fireEvent.animationEnd(ghost as HTMLElement);
+    expect(document.querySelector(".sheet-backdrop--closing")).toBeNull();
+    style.mockRestore();
+  });
+
+  it("removes the copy after a fallback delay when no animation end arrives", async () => {
+    vi.useFakeTimers();
+    const style = animated("sheet-out");
+    render(<Toggle />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await act(async () => undefined);
+    expect(document.querySelector(".sheet-backdrop--closing")).not.toBeNull();
+    act(() => vi.advanceTimersByTime(400));
+    expect(document.querySelector(".sheet-backdrop--closing")).toBeNull();
+    style.mockRestore();
+    vi.useRealTimers();
+  });
+
+  it("leaves no copy when the styles give it no animation", async () => {
+    const style = animated("none");
+    render(<Toggle />);
+    fireEvent.keyDown(window, { key: "Escape" });
+    await act(async () => undefined);
+    expect(document.querySelector(".sheet-backdrop")).toBeNull();
+    style.mockRestore();
+  });
+
+  it("plays no exit when the whole window goes away", async () => {
+    const style = animated("sheet-out");
+    const { unmount } = render(<Toggle />);
+    unmount();
+    await act(async () => undefined);
+    expect(document.querySelector(".sheet-backdrop--closing")).toBeNull();
+    style.mockRestore();
+  });
+});
+
 describe("open sheet count", () => {
   function Sheets({ count }: { count: number }) {
     return (
