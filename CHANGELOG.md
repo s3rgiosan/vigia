@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-10-10
+
+### Changed
+
+- Sheets in Settings slide back up when they close, the way they slide down when they open.
+- Repository and run rows, section headings, segmented controls and the Settings pane buttons darken as soon as they are pressed.
+- The popup grows out of the edge next to the tray icon when it opens: the top, or the bottom on Windows, where it opens above the taskbar.
+- With Reduce Motion on, the popup and sheets fade in and out in place.
+- The popup list fades out at an edge where there is more to scroll to, and the separator above the footer is gone.
+- Banners in the popup fade in when they appear.
+- The status dot in the popup header pulses while runs are in progress, like the dots on the rows.
+
+### Fixed
+
+- The Refresh button keeps its spinning icon at full strength while a refresh runs, and pulses it when Reduce Motion is on.
+
 ## [1.2.0] - 2026-10-10
 
 ### Added
@@ -36,7 +52,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release.
 
-[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.1...HEAD
+[1.2.1]: https://github.com/s3rgiosan/vigia/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/s3rgiosan/vigia/compare/1.1.1...1.2.0
 [1.1.1]: https://github.com/s3rgiosan/vigia/compare/1.1.0...1.1.1
 [1.1.0]: https://github.com/s3rgiosan/vigia/compare/1.0.0...1.1.0
