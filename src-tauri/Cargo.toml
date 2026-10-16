@@ -46,6 +46,10 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
 tauri-plugin-process = "2"
 
+# Dependencies build without debug info to keep target/debug small; the app crate keeps it.
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 codegen-units = 1
 lto = true
