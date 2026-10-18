@@ -1,3 +1,5 @@
+<img src="src-tauri/icons/128x128@2x.png" alt="Vigia app icon" width="128" height="128">
+
 # Vigia
 
 Vigia is a menu bar app for macOS, and a tray app for Linux and Windows, that shows the state of CI runs across many repositories. It reads GitHub Actions on github.com and GitLab CI on gitlab.com or self-managed instances.
