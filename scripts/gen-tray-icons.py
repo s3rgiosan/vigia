@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Render the menu bar icons at 2x into src-tauri/icons/tray.
 
-The menu bar shows the app's mark, a porthole: a thick rim with four rivets and the sea filling
-the lower part of the glass. The porthole is always a template image that macOS tints for the
+The menu bar shows the app's mark, a porthole: a thick rim, four rivets on the diagonals outside
+it, and a glint on translucent glass. The porthole is always a template image that macOS tints for the
 menu bar; status color lives in a separate badge the app overlays on the lower right corner:
 
 - `porthole.png`: the plain porthole, shown when idle;
@@ -20,9 +20,10 @@ Run from the repo root after changing any value. `BADGE_CENTER` and `BADGE_SIZE`
 `BADGE_CENTER` and `BADGE_SIZE` in src-tauri/src/tray.rs.
 """
 
+import math
 from pathlib import Path
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 SIZE = 18  # points; the menu bar is 22 pt tall and icons sit at about 18 pt
 SCALE = 8  # render large, then downsample for smooth edges
@@ -41,35 +42,62 @@ STATUS = {
 
 # Geometry on an 18 pt canvas, scaled up below.
 CENTER = 8.6
-RIM_OUTER = 7.8
-RIM_WIDTH = 2.5  # a thick band reads as a porthole rim at menu bar size
-RIVET_R = 0.62  # rivets are holes punched into the rim
-HORIZON = 1.2  # horizon line height below the centre
+RIM_OUTER = 7.6
+RIM_WIDTH = 2.2  # a thick band reads as a porthole rim at menu bar size
+GLASS_R = 5.05  # the glass sits just inside the rim, with a thin gap
+RIVET_OFFSET = 6.4  # along each axis from the centre, so the rivets clear the rim
+RIVET_R = 0.85
+GLINT_R = 3.86
+GLINT_WIDTH = 1.65
+GLINT_ANGLES = (-145.7, -74.5)  # degrees, clockwise from 3 o'clock: the upper left of the glass
+# Opacity of each part; the rim is opaque.
+GLASS_OPACITY = 0.30
+RIVET_OPACITY = 0.70  # the rivets are small, so they stay fairly opaque
+GLINT_OPACITY = 0.90
 BADGE_CENTER = (14.5, 14.5)  # from the top left of the porthole canvas
 BADGE_SIZE = 7  # points; the badge image is a square this size
 BADGE_GAP = 0.9  # transparent ring between the badge and the porthole
 GLYPH_STROKE = 1.05
 
 
-def porthole(draw: ImageDraw.ImageDraw, k: float, color) -> None:
+def porthole(size: int, k: float) -> Image.Image:
+    """The porthole's alpha mask: each part drawn at its opacity and layered over the others."""
     c = CENTER * k
-    outer = RIM_OUTER * k
-    inner = (RIM_OUTER - RIM_WIDTH) * k
-    draw.ellipse([c - outer, c - outer, c + outer, c + outer], fill=color)
-    draw.ellipse([c - inner, c - inner, c + inner, c + inner], fill=(0, 0, 0, 0))
-    # Four rivets on the diagonals, centred in the rim band.
-    mid = (RIM_OUTER - RIM_WIDTH / 2) * 0.7071 * k
-    r = RIVET_R * k
-    for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
-        x, y = c + dx * mid, c + dy * mid
-        draw.ellipse([x - r, y - r, x + r, y + r], fill=(0, 0, 0, 0))
-    # The sea: the lower part of the glass, below the horizon.
-    sea = Image.new("L", draw.im.size, 0)
-    sdraw = ImageDraw.Draw(sea)
-    gap = 0.9 * k
-    sdraw.ellipse([c - inner + gap, c - inner + gap, c + inner - gap, c + inner - gap], fill=255)
-    sdraw.rectangle([0, 0, draw.im.size[0], c + HORIZON * k], fill=0)
-    draw.bitmap((0, 0), sea, fill=color)
+
+    def part(opacity: float, draw_part) -> Image.Image:
+        mask = Image.new("L", (size, size), 0)
+        draw_part(ImageDraw.Draw(mask), round(255 * opacity))
+        return mask
+
+    def circle(draw: ImageDraw.ImageDraw, x: float, y: float, r: float, fill: int) -> None:
+        draw.ellipse([x - r, y - r, x + r, y + r], fill=fill)
+
+    def rim(draw: ImageDraw.ImageDraw, fill: int) -> None:
+        circle(draw, c, c, RIM_OUTER * k, fill)
+        circle(draw, c, c, (RIM_OUTER - RIM_WIDTH) * k, 0)
+
+    def rivets(draw: ImageDraw.ImageDraw, fill: int) -> None:
+        for dx, dy in ((-1, -1), (1, -1), (-1, 1), (1, 1)):
+            circle(draw, c + dx * RIVET_OFFSET * k, c + dy * RIVET_OFFSET * k, RIVET_R * k, fill)
+
+    def glass(draw: ImageDraw.ImageDraw, fill: int) -> None:
+        circle(draw, c, c, GLASS_R * k, fill)
+
+    def glint(draw: ImageDraw.ImageDraw, fill: int) -> None:
+        # The arc's width grows inward from its box, so the box sits half a stroke outside.
+        r = (GLINT_R + GLINT_WIDTH / 2) * k
+        start, end = GLINT_ANGLES
+        draw.arc([c - r, c - r, c + r, c + r], start, end, fill=fill, width=round(GLINT_WIDTH * k))
+        for angle in GLINT_ANGLES:
+            a = math.radians(angle)
+            x, y = c + GLINT_R * k * math.cos(a), c + GLINT_R * k * math.sin(a)
+            circle(draw, x, y, GLINT_WIDTH / 2 * k, fill)
+
+    # Screen composites alpha masks the way layers stack: a + b - a * b.
+    mask = part(GLASS_OPACITY, glass)
+    for opacity, draw_part in ((GLINT_OPACITY, glint), (1, rim), (RIVET_OPACITY, rivets)):
+        mask = ImageChops.screen(mask, part(opacity, draw_part))
+    return mask
 
 
 def downsample(img: Image.Image, size: int) -> Image.Image:
@@ -80,13 +108,13 @@ def render_porthole(
     scale: int, notch: bool = False, dim: bool = False, color=TEMPLATE
 ) -> Image.Image:
     k = scale * SCALE
-    img = Image.new("RGBA", (SIZE * k, SIZE * k), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-    porthole(draw, k, color)
+    mask = porthole(SIZE * k, k)
     if notch:
         bx, by = BADGE_CENTER[0] * k, BADGE_CENTER[1] * k
         r = (BADGE_SIZE / 2 + BADGE_GAP) * k
-        draw.ellipse([bx - r, by - r, bx + r, by + r], fill=(0, 0, 0, 0))
+        ImageDraw.Draw(mask).ellipse([bx - r, by - r, bx + r, by + r], fill=0)
+    img = Image.new("RGBA", mask.size, color)
+    img.putalpha(mask)
     img = downsample(img, SIZE * scale)
     if dim:
         alpha = img.getchannel("A").point(lambda a: int(a * 0.45))
