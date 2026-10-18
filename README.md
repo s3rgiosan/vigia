@@ -1,4 +1,4 @@
-<img src="src-tauri/icons/128x128@2x.png" alt="Vigia app icon" width="128" height="128">
+<p align="center"><img src="src-tauri/icons/128x128@2x.png" alt="vigia icon" width="128" height="128"></p>
 
 # Vigia
 
