@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-10-18
+
+### Changed
+
+- The app icon is a new porthole: a light rim with four rivets and a glint on the glass, on slate blue, or on charcoal with a pale blue rim in dark mode.
+
 ## [1.2.1] - 2026-10-10
 
 ### Changed
@@ -52,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release.
 
-[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.1...HEAD
+[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.2...HEAD
+[1.2.2]: https://github.com/s3rgiosan/vigia/compare/1.2.1...1.2.2
 [1.2.1]: https://github.com/s3rgiosan/vigia/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/s3rgiosan/vigia/compare/1.1.1...1.2.0
 [1.1.1]: https://github.com/s3rgiosan/vigia/compare/1.1.0...1.1.1
