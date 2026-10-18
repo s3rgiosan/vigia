@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-10-19
+
+### Changed
+
+- The menu bar and tray icon follows the new app icon: a rim with four rivets outside it and a glint on translucent glass.
+
 ## [1.2.2] - 2026-10-18
 
 ### Changed
@@ -58,7 +64,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - First release.
 
-[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.2...HEAD
+[Unreleased]: https://github.com/s3rgiosan/vigia/compare/1.2.3...HEAD
+[1.2.3]: https://github.com/s3rgiosan/vigia/compare/1.2.2...1.2.3
 [1.2.2]: https://github.com/s3rgiosan/vigia/compare/1.2.1...1.2.2
 [1.2.1]: https://github.com/s3rgiosan/vigia/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/s3rgiosan/vigia/compare/1.1.1...1.2.0
