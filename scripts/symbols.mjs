@@ -34,6 +34,8 @@ const LUCIDE = {
   warning: "triangle-alert",
   external: "square-arrow-out-up-right",
   xmark: "x",
+  more: "ellipsis",
+  "chevron-down": "chevron-down",
 };
 
 const source = process.platform === "darwin" && process.env.VIGIA_SYMBOLS !== "lucide" ? "sf" : "lucide";

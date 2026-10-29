@@ -21,6 +21,8 @@ export const SYMBOL_NAMES = [
   "warning",
   "external",
   "xmark",
+  "more",
+  "chevron-down",
 ] as const;
 
 export type SymbolName = (typeof SYMBOL_NAMES)[number];

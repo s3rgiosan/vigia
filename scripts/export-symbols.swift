@@ -25,6 +25,8 @@ let symbols: [(name: String, symbol: String)] = [
     ("warning", "exclamationmark.triangle.fill"),
     ("external", "arrow.up.forward.square"),
     ("xmark", "xmark"),
+    ("more", "ellipsis.circle"),
+    ("chevron-down", "chevron.down"),
 ]
 
 let pointSize: CGFloat = 16

@@ -414,8 +414,12 @@ button.row__disclosure:focus-visible {
 
 /* Footer ------------------------------------------------------------------ */
 
+/* Footer: the update status, then Settings… and More. */
 .popup__footer {
-  padding: 7px 12px 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 6px 12px;
   border-top: 0.5px solid var(--separator);
   color: var(--label-secondary);
   font-size: 12px;

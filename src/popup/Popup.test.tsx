@@ -26,6 +26,7 @@ vi.mock("../lib/tauri", () => ({
   openSettings: vi.fn(),
   openUrl: vi.fn(),
   hidePopup: vi.fn(),
+  showMoreMenu: vi.fn(),
   restoreWatchedRepo: vi.fn(),
   onUpdateCheckResult: vi.fn(),
   onUpdateProgress: vi.fn(),
@@ -46,6 +47,7 @@ import { copyLink, showRepoMenu, stopWatching } from "../lib/contextMenu";
 import {
   getSnapshot,
   hidePopup,
+  showMoreMenu,
   installUpdate,
   onSnapshot,
   onUpdateCheckResult,
@@ -283,7 +285,7 @@ describe("Popup content", () => {
     expect(footer.textContent).toContain("Paused · ");
     expect(footer.textContent).toContain("Not updated yet");
     expect(footer.textContent).toContain("slowed to every 5 min");
-    expect(footer.getAttribute("aria-live")).toBe("polite");
+    expect(footer.querySelector(".popup__status")?.getAttribute("aria-live")).toBe("polite");
     expect(screen.getByRole("button", { name: "Resume" })).toBeTruthy();
   });
 
@@ -431,7 +433,7 @@ describe("Popup header actions", () => {
     expect(button.disabled).toBe(false);
   });
 
-  it("shows a friendly error when refresh fails and clears it later", async () => {
+  it("keeps a refresh error until it is dismissed", async () => {
     vi.mocked(refreshNow).mockRejectedValue("rate limited");
     await mount();
     fireEvent.click(screen.getByRole("button", { name: "Refresh now" }));
@@ -440,8 +442,10 @@ describe("Popup header actions", () => {
     expect(alert.textContent).toContain("The server is limiting requests");
     expect((screen.getByRole("button", { name: "Refresh now" }) as HTMLButtonElement).disabled).toBe(false);
     act(() => {
-      vi.advanceTimersByTime(6000);
+      vi.advanceTimersByTime(60_000);
     });
+    expect(screen.getByRole("alert")).toBeTruthy();
+    fireEvent.click(within(screen.getByRole("alert")).getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
@@ -472,7 +476,7 @@ describe("Popup header actions", () => {
 
   it("opens settings and hides the popup", async () => {
     await mount();
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Settings…" }));
     expect(openSettings).toHaveBeenCalledWith(undefined);
     await flush();
     expect(hidePopup).toHaveBeenCalled();
@@ -481,9 +485,24 @@ describe("Popup header actions", () => {
   it("reports a settings failure", async () => {
     vi.mocked(openSettings).mockRejectedValue(new Error("no window"));
     await mount();
-    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    fireEvent.click(screen.getByRole("button", { name: "Settings…" }));
     await flush();
     expect(screen.getByRole("alert").textContent).toContain("no window");
+  });
+
+  it("opens the More menu under its button", async () => {
+    vi.mocked(showMoreMenu).mockResolvedValue(undefined);
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(showMoreMenu).toHaveBeenCalledWith(0, 0);
+  });
+
+  it("reports a More menu that fails to open", async () => {
+    vi.mocked(showMoreMenu).mockRejectedValue(new Error("no menu"));
+    await mount();
+    fireEvent.click(screen.getByRole("button", { name: "More" }));
+    await flush();
+    expect(screen.getByRole("alert").textContent).toContain("no menu");
   });
 
   it("marks the title as a polite live region", async () => {
@@ -858,7 +877,9 @@ describe("Popup context actions", () => {
       await flush();
       fireEvent.click(screen.getByRole("button", { name: "Undo" }));
       await flush();
-      expect(screen.getByRole("alert").textContent).toBe("Couldn't restore it. Add it again in Settings.");
+      expect(screen.getByRole("alert").querySelector(".banner__text")?.textContent).toBe(
+        "Couldn't restore it. Add it again in Settings.",
+      );
     });
 
     it("reports a restore that throws", async () => {

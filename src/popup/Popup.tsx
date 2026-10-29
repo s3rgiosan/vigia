@@ -4,7 +4,8 @@ import type { StoppedRepo } from "../lib/contextMenu";
 import { friendlyError } from "../lib/errors";
 import { buildBanners, buildSections, formatInterval, relativeTime, summarize } from "../lib/grouping";
 import { useDocumentVisible } from "../lib/hooks/useDocumentVisible";
-import { IS_MACOS, POPUP_ABOVE_TRAY } from "../lib/platform";
+import { IS_MACOS, POPUP_ABOVE_TRAY, shortcutLabel } from "../lib/platform";
+import { isPreview } from "../lib/preview";
 import type { Snapshot, UpdateInfo } from "../lib/snapshot";
 import {
   getSnapshot,
@@ -15,6 +16,7 @@ import {
   refreshNow,
   restoreWatchedRepo,
   setPaused,
+  showMoreMenu,
   subscribe,
   type SettingsTarget,
 } from "../lib/tauri";
@@ -26,9 +28,6 @@ import { useTransientMessage } from "./useTransientMessage";
 import { usePopupShortcuts } from "./usePopupShortcuts";
 import { useWindowFit } from "./useWindowFit";
 import "./Popup.css";
-
-/** How long an error line stays visible. */
-const ERROR_MS = 6000;
 
 /** How long the Undo banner stays visible. */
 const UNDO_MS = 8000;
@@ -53,7 +52,8 @@ export function Popup() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [filter, setFilter] = useState("");
   const [now, setNow] = useState(() => new Date());
-  const [error, showError] = useTransientMessage<string>(ERROR_MS);
+  // Errors stay until dismissed; the other banners clear themselves.
+  const [error, setError] = useState<string | null>(null);
   const [stopped, showStopped, clearStopped] = useTransientMessage<StoppedRepo>(UNDO_MS);
   const [upToDate, showUpToDate] = useTransientMessage<true>(UP_TO_DATE_MS);
   const [found, setFound] = useState<UpdateInfo | null>(null);
@@ -63,14 +63,11 @@ export function Popup() {
   const listRef = useRef<HTMLDivElement>(null);
   const visible = useDocumentVisible();
 
-  /** Logs a failed command and shows it briefly in the popup. */
-  const report = useCallback(
-    (e: unknown) => {
-      console.error(e);
-      showError(friendlyError(e));
-    },
-    [showError],
-  );
+  /** Logs a failed command and shows it in the popup until dismissed. */
+  const report = useCallback((e: unknown) => {
+    console.error(e);
+    setError(friendlyError(e));
+  }, []);
 
   /** Stores a new snapshot; a refresh counts as finished once one arrives. */
   const receive = useCallback(
@@ -130,7 +127,7 @@ export function Popup() {
         onUpdateCheckResult(({ update, error }) => {
           if (error !== null) {
             console.error(error);
-            showError(friendlyError(error));
+            setError(friendlyError(error));
           } else if (update !== null) {
             setFound(update);
           } else {
@@ -138,7 +135,7 @@ export function Popup() {
           }
         }),
       ),
-    [showError, showUpToDate],
+    [showUpToDate],
   );
 
   // Relative times update only while the popup is on screen, and once more when it reappears.
@@ -174,6 +171,19 @@ export function Popup() {
     hidePopup().catch(report);
   }, [report]);
 
+  /** Opens the native menu with About, Settings… and Quit under the More button. */
+  const more = useCallback(
+    (button: HTMLElement) => {
+      if (isPreview()) {
+        console.info("[preview] more menu");
+        return;
+      }
+      const rect = button.getBoundingClientRect();
+      showMoreMenu(rect.left, rect.bottom).catch(report);
+    },
+    [report],
+  );
+
   /** Puts a stopped repo back on the watch list. */
   const undoStop = useCallback(
     (entry: StoppedRepo) => {
@@ -181,12 +191,12 @@ export function Popup() {
       restoreWatchedRepo(entry.token)
         .then((restored) => {
           if (!restored) {
-            showError("Couldn't restore it. Add it again in Settings.");
+            setError("Couldn't restore it. Add it again in Settings.");
           }
         })
         .catch(report);
     },
-    [clearStopped, report, showError],
+    [clearStopped, report],
   );
 
   usePopupShortcuts({ filterRef, setFilter, refresh, openSettings: settings, hide });
@@ -270,7 +280,7 @@ export function Popup() {
             className={`icon ${refreshing ? "icon--spinning" : ""}`}
             onClick={refresh}
             disabled={snapshot.paused || refreshing !== null}
-            title="Refresh Now (⌘R)"
+            title={`Refresh Now (${shortcutLabel("R")})`}
             aria-label="Refresh now"
             aria-busy={refreshing !== null}
           >
@@ -285,9 +295,6 @@ export function Popup() {
           >
             <Icon name={snapshot.paused ? "play" : "pause"} />
           </button>
-          <button type="button" className="icon" onClick={() => settings()} title="Settings (⌘,)" aria-label="Settings">
-            <Icon name="gear" />
-          </button>
         </div>
       </header>
 
@@ -296,7 +303,7 @@ export function Popup() {
         <input
           ref={filterRef}
           type="search"
-          placeholder="Filter"
+          placeholder="Filter Repositories"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           aria-label="Filter repositories"
@@ -310,7 +317,10 @@ export function Popup() {
           {error ? (
             <div className="banner banner--error" role="alert">
               <Icon name="warning" size={14} />
-              {error}
+              <span className="banner__text">{error}</span>
+              <button type="button" className="banner__action" onClick={() => setError(null)}>
+                Dismiss
+              </button>
             </div>
           ) : null}
           {stopped ? (
@@ -366,15 +376,36 @@ export function Popup() {
         </div>
       </div>
 
-      <footer className="popup__footer numeric" aria-live="polite">
-        {snapshot.paused ? "Paused · " : ""}
-        {updated ? `Updated ${updated}` : "Not updated yet"}
-        {stretched ? (
-          <span title="Slowed down to stay within the API rate limit">
-            {" "}
-            · slowed to every {formatInterval(stretched.effective_interval_secs)}
-          </span>
-        ) : null}
+      <footer className="popup__footer">
+        <span className="popup__status numeric" aria-live="polite">
+          {snapshot.paused ? "Paused · " : ""}
+          {updated ? `Updated ${updated}` : "Not updated yet"}
+          {stretched ? (
+            <span title="Slowed down to stay within the API rate limit">
+              {" "}
+              · slowed to every {formatInterval(stretched.effective_interval_secs)}
+            </span>
+          ) : null}
+        </span>
+        <button
+          type="button"
+          className="icon"
+          onClick={() => settings()}
+          title={`Settings… (${shortcutLabel(",")})`}
+          aria-label="Settings…"
+        >
+          <Icon name="gear" />
+        </button>
+        <button
+          type="button"
+          className="icon"
+          onClick={(e) => more(e.currentTarget)}
+          title="More"
+          aria-label="More"
+          aria-haspopup="menu"
+        >
+          <Icon name="more" />
+        </button>
       </footer>
     </main>
   );
