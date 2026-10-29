@@ -15,9 +15,18 @@
   --control-bg: #fff;
   --window-bg: #ececec;
   --group-bg: rgb(255 255 255 / 75%);
-  --accent: #0a84ff;
+  --accent: #007aff;
   --accent-text: #fff;
-  --selection: rgb(10 132 255 / 18%);
+  /* Selected rows: the first while the list has focus, the second while it does not. */
+  --selection: #0064e1;
+  --selection-unfocused: #dcdcdc;
+  --selection-text: #fff;
+  /* Switch knob and its edge and shadow. */
+  --knob: #fff;
+  --knob-edge: rgb(0 0 0 / 8%);
+  --knob-shadow: rgb(0 0 0 / 22%);
+  /* Status dots draw a darker edge of their own colour, so they reach 3:1 on light backgrounds. */
+  --dot-edge: color-mix(in srgb, currentcolor 60%, black);
   /*
    * Solid surface for sheets. The system window background color renders as clear inside the
    * webview, so sheets need an explicit color or the pane behind shows through.
@@ -43,9 +52,9 @@
   --green: #34c759;
   --gray: #8e8e93;
 
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-family: system-ui, -apple-system, sans-serif;
   font-size: 13px;
-  line-height: 1.3;
+  line-height: 16px;
   color: var(--label);
   -webkit-font-smoothing: antialiased;
   user-select: none;
@@ -63,7 +72,9 @@
     --control-bg: rgb(255 255 255 / 8%);
     --window-bg: #232325;
     --group-bg: rgb(255 255 255 / 5%);
-    --selection: rgb(10 132 255 / 30%);
+    --selection: #0059d1;
+    --selection-unfocused: #464646;
+    --dot-edge: rgb(0 0 0 / 22%);
     --surface: #2b2b2e;
     --control-fill: rgb(255 255 255 / 11%);
     --control-fill-strong: rgb(255 255 255 / 20%);
@@ -92,13 +103,13 @@
     --yellow: -apple-system-yellow;
     --green: -apple-system-green;
     --gray: -apple-system-gray;
-  }
-}
-
-/* AccentColorText resolves to black in the webview, so labels on the accent stay white. */
-@supports (color: AccentColor) {
-  :root {
-    --accent: AccentColor;
+    --selection: -apple-system-selected-content-background;
+    --selection-unfocused: -apple-system-unemphasized-selected-content-background;
+    /*
+     * The app also reads the user's accent natively and sets --accent on the root element (see
+     * src/lib/systemAppearance.ts), which takes precedence over this value.
+     */
+    --accent: -apple-system-control-accent;
   }
 }
 
@@ -226,12 +237,12 @@ button.icon[aria-busy="true"]:disabled {
   mask-size: contain;
 }
 
+/* WebKit draws the platform focus ring. */
 button:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  outline-offset: 1px;
+  outline: auto;
 }
 
 /* Text field. */
@@ -341,8 +352,7 @@ textarea:focus-visible {
 }
 
 .popup-button:has(select:focus-visible) {
-  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  outline-offset: 1px;
+  outline: auto;
 }
 
 .popup-button--disabled {
@@ -462,10 +472,10 @@ input[type="checkbox"].toggle::after {
   width: 26px;
   height: 20px;
   border-radius: 10px;
-  background: #fff;
+  background: var(--knob);
   box-shadow:
-    0 0 0 0.5px rgb(0 0 0 / 8%),
-    0 1px 3px rgb(0 0 0 / 22%);
+    0 0 0 0.5px var(--knob-edge),
+    0 1px 3px var(--knob-shadow);
   transition: transform 160ms cubic-bezier(0.3, 0.7, 0.4, 1);
 }
 
@@ -555,33 +565,51 @@ button.link:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/* Chrome is not selectable; content, names, messages and values are. */
+.selectable,
+.banner__text,
+.banner .grow,
+.row__name,
+.row__detail,
+.run__name,
+.sheet__text,
+.sheet__note,
+.form-row__help,
+.form-row__description,
+.form-section__footer,
+code {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .dot {
   display: inline-block;
   flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  box-shadow: inset 0 0 0 0.5px rgb(0 0 0 / 22%);
+  background: currentcolor;
+  box-shadow: inset 0 0 0 1px var(--dot-edge);
 }
 
 .dot--red {
-  background: var(--red);
+  color: var(--red);
 }
 
 .dot--orange {
-  background: var(--orange);
+  color: var(--orange);
 }
 
 .dot--yellow {
-  background: var(--yellow);
+  color: var(--yellow);
 }
 
 .dot--green {
-  background: var(--green);
+  color: var(--green);
 }
 
 .dot--gray {
-  background: var(--gray);
+  color: var(--gray);
 }
 
 .dot--pulse {
@@ -613,7 +641,7 @@ button.link:hover {
   padding: 7px 10px;
   border-radius: var(--radius-row);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 15px;
 }
 
 .banner--info {
@@ -688,24 +716,25 @@ button.link:hover {
   }
 }
 
-/* Reduce Transparency: translucent surfaces become opaque. */
-@media (prefers-reduced-transparency: reduce) {
-  :root {
-    --group-bg: #fff;
-    --field-bg: #fff;
-  }
-
-  .banner--error {
-    background: color-mix(in srgb, var(--red) 14%, var(--surface));
-  }
-
-  .banner--warn {
-    background: color-mix(in srgb, var(--orange) 16%, var(--surface));
-  }
+/*
+ * Reduce Transparency: translucent surfaces become opaque. WKWebView never matches the
+ * prefers-reduced-transparency query, so the app reads the setting natively and sets this class.
+ */
+:root.reduce-transparency {
+  --group-bg: #fff;
+  --field-bg: #fff;
 }
 
-@media (prefers-reduced-transparency: reduce) and (prefers-color-scheme: dark) {
-  :root {
+:root.reduce-transparency .banner--error {
+  background: color-mix(in srgb, var(--red) 14%, var(--surface));
+}
+
+:root.reduce-transparency .banner--warn {
+  background: color-mix(in srgb, var(--orange) 16%, var(--surface));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root.reduce-transparency {
     --group-bg: #38383a;
     --field-bg: #1c1c1e;
   }

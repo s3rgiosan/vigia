@@ -9,6 +9,9 @@ async function start() {
   }
   // App is loaded after the fake backend so its modules see the preview flag.
   const { default: App } = await import("./App");
+  const { trackSystemAppearance, trackWindowActive } = await import("./lib/systemAppearance");
+  trackWindowActive();
+  trackSystemAppearance();
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
