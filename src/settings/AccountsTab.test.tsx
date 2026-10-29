@@ -8,6 +8,7 @@ import { makeSettingsContext, renderWithSettings } from "../test/settings";
 import type { SheetRequest } from "./SettingsContext";
 
 const addAccount = vi.fn();
+const confirmDestructive = vi.fn();
 const deleteAccount = vi.fn();
 const deleteAllAccounts = vi.fn();
 const openGithubTokenPage = vi.fn();
@@ -15,8 +16,14 @@ const renameAccount = vi.fn();
 const replaceToken = vi.fn();
 const testConnection = vi.fn();
 
+const showActionMenu = vi.fn();
+vi.mock("../lib/actionMenu", () => ({
+  showActionMenu: (...a: unknown[]) => showActionMenu(...a),
+}));
+
 vi.mock("../lib/tauri", () => ({
   addAccount: (...a: unknown[]) => addAccount(...a),
+  confirmDestructive: (...a: unknown[]) => confirmDestructive(...a),
   deleteAccount: (...a: unknown[]) => deleteAccount(...a),
   deleteAllAccounts: (...a: unknown[]) => deleteAllAccounts(...a),
   openGithubTokenPage: (...a: unknown[]) => openGithubTokenPage(...a),
@@ -74,12 +81,8 @@ function accountOptions() {
   return within(screen.getByRole("listbox", { name: "Accounts" })).getAllByRole("option");
 }
 
-function alert() {
-  return screen.getByRole("alertdialog");
-}
-
 function moreActions() {
-  return screen.getByRole("combobox", { name: "More Actions" }) as HTMLSelectElement;
+  return screen.getByRole("button", { name: "More Actions" }) as HTMLButtonElement;
 }
 
 function field(label: string): HTMLInputElement {
@@ -91,12 +94,13 @@ function typeInto(label: string, value: string) {
 }
 
 beforeEach(() => {
-  for (const fn of [addAccount, deleteAccount, deleteAllAccounts, openGithubTokenPage, renameAccount, replaceToken, testConnection, onRequestHandled]) {
+  for (const fn of [addAccount, confirmDestructive, deleteAccount, deleteAllAccounts, openGithubTokenPage, renameAccount, replaceToken, showActionMenu, testConnection, onRequestHandled]) {
     fn.mockReset();
   }
   addAccount.mockResolvedValue({ id: "a3", kind: "github", label: "New" });
   deleteAccount.mockResolvedValue(undefined);
   deleteAllAccounts.mockResolvedValue(2);
+  showActionMenu.mockResolvedValue(undefined);
   renameAccount.mockResolvedValue(undefined);
   replaceToken.mockResolvedValue(undefined);
   testConnection.mockResolvedValue({ user_id: 1, login: "example-user" });
@@ -206,7 +210,10 @@ describe("account list", () => {
 
   it("offers Remove All Accounts only with two or more accounts", () => {
     const { update } = mount();
-    expect(within(moreActions()).getByRole("option", { name: "Remove All Accounts…" })).toBeTruthy();
+    fireEvent.click(moreActions());
+    expect(showActionMenu.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ label: "Remove All Accounts…", disabled: false }),
+    ]);
     expect(moreActions().disabled).toBe(false);
     update(makeView({ accounts: [github] }));
     expect(moreActions().disabled).toBe(true);
@@ -610,75 +617,80 @@ describe("Replace Token sheet", () => {
 });
 
 describe("removing accounts", () => {
-  it("confirms before removing, with Cancel as the default button", async () => {
+  /** Chooses Remove All Accounts… from the pull-down menu. */
+  function chooseRemoveAll() {
+    showActionMenu.mockImplementation((actions: { onSelect: () => void }[]) => {
+      actions[0].onSelect();
+      return Promise.resolve();
+    });
+    fireEvent.click(moreActions());
+  }
+
+  it("confirms with a native alert before removing", async () => {
+    confirmDestructive.mockResolvedValue(true);
     mount();
     fireEvent.click(screen.getByLabelText("Remove account"));
-    const sheet = alert();
-    expect(within(sheet).getByRole("heading", { name: "Remove “Acme”?" })).toBeTruthy();
-    expect(sheet.getAttribute("aria-describedby")).toBe(within(sheet).getByText(/stops watching/).id);
-    expect(within(sheet).getByText(/2 repositories/)).toBeTruthy();
-    expect(within(sheet).getByText(/stays valid on GitHub/)).toBeTruthy();
-    expect(within(sheet).getByRole("button", { name: "Cancel" }).className).toBe("default");
-    fireEvent.click(within(sheet).getByRole("button", { name: "Remove" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(deleteAccount).toHaveBeenCalledWith("a1");
-    expect(context.reload).toHaveBeenCalled();
+    await waitFor(() => expect(deleteAccount).toHaveBeenCalledWith("a1"));
+    const [confirmation] = confirmDestructive.mock.calls[0];
+    expect(confirmation.title).toBe("Remove “Acme”?");
+    expect(confirmation.confirmLabel).toBe("Remove");
+    expect(confirmation.message).toContain("2 repositories");
+    expect(confirmation.message).toContain("stays valid on GitHub");
+    await waitFor(() => expect(context.reload).toHaveBeenCalled());
   });
 
-  it("names GitLab and one repository for a GitLab account", () => {
+  it("names GitLab and one repository for a GitLab account", async () => {
+    confirmDestructive.mockResolvedValue(false);
     mount();
     fireEvent.click(accountOptions()[1]);
     fireEvent.click(screen.getByLabelText("Remove account"));
-    expect(within(alert()).getByText(/1 repository/)).toBeTruthy();
-    expect(within(alert()).getByText(/stays valid on GitLab/)).toBeTruthy();
+    await waitFor(() => expect(confirmDestructive).toHaveBeenCalled());
+    const [confirmation] = confirmDestructive.mock.calls[0];
+    expect(confirmation.message).toContain("1 repository");
+    expect(confirmation.message).toContain("stays valid on GitLab");
   });
 
-  it("shows a busy label while removing", async () => {
-    let finish: () => void = () => undefined;
-    deleteAccount.mockImplementation(() => new Promise<void>((r) => (finish = r)));
+  it("does not remove when the alert is cancelled", async () => {
+    confirmDestructive.mockResolvedValue(false);
     mount();
     fireEvent.click(screen.getByLabelText("Remove account"));
-    fireEvent.click(within(alert()).getByRole("button", { name: "Remove" }));
-    await waitFor(() => expect(within(alert()).getByRole("button", { name: "Removing…" })).toBeTruthy());
-    expect((within(alert()).getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(true);
-    await act(async () => finish());
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(confirmDestructive).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(deleteAccount).not.toHaveBeenCalled();
   });
 
-  it("keeps the sheet open and reports the error when removal fails", async () => {
+  it("reports the error when removal fails", async () => {
+    confirmDestructive.mockResolvedValue(true);
     deleteAccount.mockRejectedValue("unknown account");
     mount();
     fireEvent.click(screen.getByLabelText("Remove account"));
-    fireEvent.click(within(alert()).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(context.setError).toHaveBeenCalledWith("That account no longer exists. Reopen Settings and try again."));
-    expect(alert()).toBeTruthy();
-    expect(within(alert()).getByRole("button", { name: "Remove" })).toBeTruthy();
   });
 
-  it("does not remove on Return and cancels instead", () => {
+  it("reports an alert that fails to show", async () => {
+    confirmDestructive.mockRejectedValue("no window");
     mount();
     fireEvent.click(screen.getByLabelText("Remove account"));
-    fireEvent.keyDown(alert(), { key: "Enter" });
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    await waitFor(() => expect(context.setError).toHaveBeenCalled());
     expect(deleteAccount).not.toHaveBeenCalled();
   });
 
   it("removes every account after confirmation", async () => {
+    confirmDestructive.mockResolvedValue(true);
     mount();
-    fireEvent.change(moreActions(), { target: { value: "0" } });
-    const sheet = alert();
-    expect(within(sheet).getByRole("heading", { name: "Remove all 2 accounts?" })).toBeTruthy();
-    expect(within(sheet).getByRole("button", { name: "Cancel" }).className).toBe("default");
-    fireEvent.click(within(sheet).getByRole("button", { name: "Remove All" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(deleteAllAccounts).toHaveBeenCalled();
+    chooseRemoveAll();
+    await waitFor(() => expect(deleteAllAccounts).toHaveBeenCalled());
+    const [confirmation] = confirmDestructive.mock.calls[0];
+    expect(confirmation.title).toBe("Remove all 2 accounts?");
+    expect(confirmation.confirmLabel).toBe("Remove All");
   });
 
-  it("cancels Remove All without deleting", () => {
+  it("cancels Remove All without deleting", async () => {
+    confirmDestructive.mockResolvedValue(false);
     mount();
-    fireEvent.change(moreActions(), { target: { value: "0" } });
-    fireEvent.click(within(alert()).getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
+    chooseRemoveAll();
+    await waitFor(() => expect(confirmDestructive).toHaveBeenCalled());
+    await act(async () => undefined);
     expect(deleteAllAccounts).not.toHaveBeenCalled();
   });
 });

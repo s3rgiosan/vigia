@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Sheet } from "../components/Sheet";
 import type { Snapshot } from "../lib/snapshot";
 import type { SettingsOpen, SettingsView } from "../lib/tauri";
 import { makeSnapshot, makeView } from "../test/fixtures";
@@ -10,6 +12,8 @@ const getSettings = vi.fn();
 const getSnapshot = vi.fn();
 const retrySecrets = vi.fn();
 const resetSecrets = vi.fn();
+const confirmDestructive = vi.fn();
+const zoomWindow = vi.fn();
 const selectSettingsPane = vi.fn();
 const setSettingsToolbarEnabled = vi.fn();
 const setTitle = vi.fn();
@@ -22,6 +26,8 @@ vi.mock("../lib/tauri", () => ({
   getSnapshot: () => getSnapshot(),
   retrySecrets: () => retrySecrets(),
   resetSecrets: () => resetSecrets(),
+  confirmDestructive: (...a: unknown[]) => confirmDestructive(...a),
+  zoomWindow: (...a: unknown[]) => zoomWindow(...a),
   selectSettingsPane: (pane: string) => selectSettingsPane(pane),
   setSettingsToolbarEnabled: (enabled: boolean) => setSettingsToolbarEnabled(enabled),
   onSettingsOpen: (handler: (payload: SettingsOpen) => void) => {
@@ -63,8 +69,11 @@ vi.mock("./useSettingsSaver", () => ({ useSettingsSaver: () => vi.fn(async () =>
 function stub(name: string) {
   return function Stub() {
     const { reload, setError, requestAdd, readOnly } = useSettings();
+    const [sheet, setSheet] = useState(false);
     return (
       <div data-testid={`pane-${name}`}>
+        <button type="button" onClick={() => setSheet(true)}>{`${name} sheet`}</button>
+        {sheet ? <Sheet title="Example Sheet" submitLabel="Done" onCancel={() => setSheet(false)} onSubmit={() => setSheet(false)} /> : null}
         <span>{`${name} readOnly=${readOnly}`}</span>
         <button type="button" onClick={() => void reload()}>{`${name} reload`}</button>
         <button type="button" onClick={() => setError("boom")}>{`${name} fail`}</button>
@@ -133,6 +142,8 @@ beforeEach(() => {
   getSnapshot.mockReset().mockResolvedValue(makeSnapshot());
   retrySecrets.mockReset().mockResolvedValue(true);
   resetSecrets.mockReset().mockResolvedValue(true);
+  confirmDestructive.mockReset().mockResolvedValue(true);
+  zoomWindow.mockReset().mockResolvedValue(undefined);
   selectSettingsPane.mockReset().mockResolvedValue(undefined);
   setSettingsToolbarEnabled.mockReset().mockResolvedValue(undefined);
   setTitle.mockReset().mockResolvedValue(undefined);
@@ -231,10 +242,9 @@ describe("pane selection", () => {
 
 describe("open sheets", () => {
   async function openResetSheet() {
-    getSettings.mockResolvedValue(makeView({ secrets_blocked: true }));
     await mount();
-    fireEvent.click(screen.getByText("Reset Keychain Item…"));
-    expect(screen.getByRole("alertdialog", { name: "Reset Keychain Item?" })).toBeTruthy();
+    fireEvent.click(screen.getByText("accounts sheet"));
+    expect(screen.getByRole("dialog", { name: "Example Sheet" })).toBeTruthy();
   }
 
   it("ignores pane switches and re-highlights the current pane", async () => {
@@ -269,13 +279,30 @@ describe("Linux and Windows", () => {
     expect(selectSettingsPane).toHaveBeenLastCalledWith("general");
   });
 
+  it("switches panes with Ctrl and zooms with Ctrl+0, Ctrl+= and Ctrl+-", async () => {
+    platform = "linux";
+    await mount();
+    fireEvent.keyDown(window, { key: "4", metaKey: true });
+    expect(screen.getByTestId("pane-accounts")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "4", ctrlKey: true });
+    expect(screen.getByTestId("pane-general")).toBeTruthy();
+    fireEvent.keyDown(window, { key: "=", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "-", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "0", ctrlKey: true });
+    fireEvent.keyDown(window, { key: "x", ctrlKey: true });
+    expect(zoomWindow.mock.calls).toEqual([["in"], ["out"], ["reset"]]);
+  });
+
   it("names the token store as the OS does", async () => {
     platform = "linux";
     getSettings.mockResolvedValue(makeView({ secrets_blocked: true }));
     await mount();
     expect(screen.getByText("Vigia can’t read its tokens from the keyring.")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Reset Keyring Item…" }));
-    expect(screen.getByRole("alertdialog", { name: "Reset Keyring Item?" })).toBeTruthy();
+    await waitFor(() => expect(confirmDestructive).toHaveBeenCalled());
+    expect(confirmDestructive.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ title: "Reset Keyring Item?", confirmLabel: "Reset" }),
+    );
   });
 });
 
@@ -298,9 +325,8 @@ describe("browser preview", () => {
   });
 
   it("ignores pane switches while a sheet is open without calling the native window", async () => {
-    getSettings.mockResolvedValue(makeView({ secrets_blocked: true }));
     await mount({ preview: true });
-    fireEvent.click(screen.getByText("Reset Keychain Item…"));
+    fireEvent.click(screen.getByText("accounts sheet"));
     fireEvent.click(screen.getByRole("button", { name: /Filters/ }));
     expect(screen.getByTestId("pane-accounts")).toBeTruthy();
     expect(selectSettingsPane).not.toHaveBeenCalled();
@@ -422,52 +448,53 @@ describe("Keychain banner", () => {
     log.mockRestore();
   });
 
-  it("resets the item, closes the sheet and reloads", async () => {
+  it("confirms with a native alert, resets the item and reloads", async () => {
     await mount();
-    fireEvent.click(screen.getByText("Reset Keychain Item…"));
     getSettings.mockResolvedValue(makeView());
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(resetSecrets).toHaveBeenCalled();
-    expect(screen.queryByText("Try Again")).toBeNull();
+    fireEvent.click(screen.getByText("Reset Keychain Item…"));
+    await waitFor(() => expect(resetSecrets).toHaveBeenCalled());
+    expect(confirmDestructive.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ title: "Reset Keychain Item?", confirmLabel: "Reset" }),
+    );
+    await waitFor(() => expect(screen.queryByText("Try Again")).toBeNull());
   });
 
-  it("keeps the sheet open with a message when the reset returns false", async () => {
+  it("does not reset when the alert is cancelled", async () => {
+    confirmDestructive.mockResolvedValue(false);
+    await mount();
+    fireEvent.click(screen.getByText("Reset Keychain Item…"));
+    await waitFor(() => expect(confirmDestructive).toHaveBeenCalled());
+    await act(async () => undefined);
+    expect(resetSecrets).not.toHaveBeenCalled();
+  });
+
+  it("shows an error when the reset returns false", async () => {
     resetSecrets.mockResolvedValue(false);
     await mount();
     fireEvent.click(screen.getByText("Reset Keychain Item…"));
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    await waitFor(() => expect(screen.getByText("The Keychain item couldn’t be reset.")).toBeTruthy());
-    expect(screen.getByRole("alertdialog")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("alertdialog")).toBeNull();
-    fireEvent.click(screen.getByText("Reset Keychain Item…"));
-    expect(screen.queryByText("The Keychain item couldn’t be reset.")).toBeNull();
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("The Keychain item couldn’t be reset."));
   });
 
-  it("closes the sheet and shows an error when the reset rejects", async () => {
+  it("shows an error when the reset rejects", async () => {
     const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
     resetSecrets.mockRejectedValue("keychain write blocked");
     await mount();
     fireEvent.click(screen.getByText("Reset Keychain Item…"));
-    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
-    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
-    expect(screen.getByRole("alert").textContent).toContain("Vigia can't use the Keychain");
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Vigia can't use the Keychain"));
     log.mockRestore();
   });
 });
 
 describe("native toolbar while a sheet is open", () => {
-  it("disables the toolbar while the Reset sheet shows and enables it after", async () => {
-    getSettings.mockResolvedValue(makeView({ secrets_blocked: true }));
+  it("disables the toolbar while a sheet shows and enables it after", async () => {
     await mount();
-    screen.getByText("Reset Keychain Item…").focus();
-    fireEvent.click(screen.getByText("Reset Keychain Item…"));
+    screen.getByText("accounts sheet").focus();
+    fireEvent.click(screen.getByText("accounts sheet"));
     expect(setSettingsToolbarEnabled).toHaveBeenLastCalledWith(false);
-    expect(screen.getByRole("main").querySelector(".pane")?.hasAttribute("inert")).toBe(true);
+    expect(screen.getByTestId("pane-accounts").firstElementChild?.hasAttribute("inert")).toBe(true);
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(setSettingsToolbarEnabled).toHaveBeenLastCalledWith(true);
-    expect(document.activeElement).toBe(screen.getByText("Reset Keychain Item…"));
+    expect(document.activeElement).toBe(screen.getByText("accounts sheet"));
   });
 
   it("remembers the pane in storage and survives storage that throws", async () => {

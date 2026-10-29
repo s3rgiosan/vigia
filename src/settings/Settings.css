@@ -661,8 +661,10 @@ code {
 }
 
 /* Action pop-up button beside the add and remove buttons: a "…" glyph over a native menu. */
+/* Pull-down button: a "…" glyph and a trailing chevron that open a native menu. */
 .action-popup {
-  position: relative;
+  -webkit-appearance: none;
+  appearance: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -675,20 +677,15 @@ code {
   color: var(--label);
 }
 
-.action-popup select {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
+.action-popup:active:not(:disabled) {
+  background: var(--control-fill-strong);
 }
 
-.action-popup:has(select:focus-visible) {
-  outline: 3px solid color-mix(in srgb, var(--accent) 50%, transparent);
-  outline-offset: 1px;
+.action-popup__chevron {
+  color: var(--label-secondary);
 }
 
-.action-popup--disabled {
+.action-popup:disabled {
   opacity: 0.6;
 }
 

@@ -1,4 +1,6 @@
+import { showActionMenu, type MenuAction } from "../lib/actionMenu";
 import { useFormDescription } from "./Form";
+import { Icon } from "./Icon";
 
 function Chevron() {
   return (
@@ -57,15 +59,11 @@ export function PopUpButton<T extends string | number>({
   );
 }
 
-export interface PopUpAction {
-  label: string;
-  onSelect: () => void;
-  disabled?: boolean;
-}
+export type PopUpAction = MenuAction;
 
 /**
- * An action pop-up button: a small "…" button whose native menu runs a command instead of
- * holding a value. The select stays on its hidden placeholder, so any item can be chosen again.
+ * A pull-down button: a small "…" button with a chevron that opens a native menu of commands.
+ * Unavailable commands show dimmed.
  */
 export function ActionPopUpButton({
   actions,
@@ -78,31 +76,26 @@ export function ActionPopUpButton({
 }) {
   const unavailable = disabled || actions.every((a) => a.disabled);
   return (
-    <span className={`action-popup ${unavailable ? "action-popup--disabled" : ""}`}>
+    <button
+      type="button"
+      className="action-popup"
+      aria-label={label}
+      aria-haspopup="menu"
+      title={label}
+      disabled={unavailable}
+      onClick={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        showActionMenu(actions, { x: rect.left, y: rect.bottom + 4 }).catch((error) =>
+          console.error("could not open the menu", error),
+        );
+      }}
+    >
       <svg className="action-popup__glyph" width="13" height="3" viewBox="0 0 13 3" aria-hidden="true">
         <circle cx="1.5" cy="1.5" r="1.4" fill="currentColor" />
         <circle cx="6.5" cy="1.5" r="1.4" fill="currentColor" />
         <circle cx="11.5" cy="1.5" r="1.4" fill="currentColor" />
       </svg>
-      <select
-        aria-label={label}
-        title={label}
-        value=""
-        disabled={unavailable}
-        onChange={(e) => {
-          const picked = e.target.value;
-          actions.find((_, index) => String(index) === picked)?.onSelect();
-        }}
-      >
-        <option value="" disabled hidden>
-          {label}
-        </option>
-        {actions.map((a, index) => (
-          <option key={a.label} value={index} disabled={a.disabled}>
-            {a.label}
-          </option>
-        ))}
-      </select>
-    </span>
+      <Icon name="chevron-down" size={9} className="action-popup__chevron" />
+    </button>
   );
 }
