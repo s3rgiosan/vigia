@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { IS_MACOS, SECRET_STORE, secretStoreNames } from "./platform";
+import { hasCommandModifier, IS_MACOS, SECRET_STORE, secretStoreNames, shortcutLabel } from "./platform";
 
 describe("platform", () => {
   it("follows macOS when no platform is set", () => {
@@ -35,5 +35,19 @@ describe("secretStoreNames", () => {
 
   it("uses the macOS names for an unknown platform", () => {
     expect(secretStoreNames("")).toEqual(secretStoreNames("darwin"));
+  });
+});
+
+describe("command modifier", () => {
+  it("is ⌘ on macOS and Ctrl elsewhere", () => {
+    expect(hasCommandModifier({ metaKey: true, ctrlKey: false }, true)).toBe(true);
+    expect(hasCommandModifier({ metaKey: false, ctrlKey: true }, true)).toBe(false);
+    expect(hasCommandModifier({ metaKey: false, ctrlKey: true }, false)).toBe(true);
+    expect(hasCommandModifier({ metaKey: true, ctrlKey: false }, false)).toBe(false);
+  });
+
+  it("labels shortcuts the way each platform writes them", () => {
+    expect(shortcutLabel("R", true)).toBe("⌘R");
+    expect(shortcutLabel("R", false)).toBe("Ctrl+R");
   });
 });

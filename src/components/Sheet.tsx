@@ -85,8 +85,8 @@ export function SheetNote({ tone = "error", children }: { tone?: "error" | "warn
 
 /**
  * A window-modal sheet that slides down from the top of the window and back up when it closes,
- * like macOS sheets. Esc
- * cancels (unless busy), Return activates the default button, and Tab cycles within the sheet.
+ * like macOS sheets. Esc and ⌘. cancel (unless busy), Return activates the default button, and Tab
+ * cycles within the sheet.
  * The rest of the window is inert while it shows, and focus returns to where it was when it
  * closes. On a destructive sheet Cancel is the default button and takes initial focus, so Return
  * never confirms the destructive action; the sheet is an alert dialog described by `message`.
@@ -177,7 +177,8 @@ export function Sheet({
       return Array.from(found).filter((el) => !el.hasAttribute("disabled"));
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
+      const cancel = e.key === "Escape" || (e.metaKey && e.key === ".");
+      if (cancel) {
         e.preventDefault();
         if (!latest.current.busy) {
           latest.current.onCancel();

@@ -1,10 +1,11 @@
 import type { KeyboardEvent } from "react";
 import { copyLink, showRepoMenu, stopWatching, type StoppedRepo } from "../lib/contextMenu";
+import { hasCommandModifier } from "../lib/platform";
 import type { RepoSnapshot, Run } from "../lib/snapshot";
 
 /**
  * Keyboard access to a row's context actions: the Menu key or Shift+F10 opens the menu,
- * ⌘C copies the link and ⌘⌫ stops watching.
+ * ⌘C copies the link and ⌘⌫ stops watching (Ctrl in place of ⌘ on Linux and Windows).
  */
 export function handleRowShortcut(
   e: KeyboardEvent<HTMLElement>,
@@ -21,12 +22,13 @@ export function handleRowShortcut(
     showRepoMenu(repo, run, isGitHub, { onError, onStopped, at }).catch(onError);
     return true;
   }
-  if (e.metaKey && e.key === "c") {
+  const command = hasCommandModifier(e);
+  if (command && e.key === "c") {
     e.preventDefault();
     copyLink(repo, run).catch(onError);
     return true;
   }
-  if (e.metaKey && e.key === "Backspace") {
+  if (command && e.key === "Backspace") {
     e.preventDefault();
     stopWatching(repo, onStopped).catch(onError);
     return true;

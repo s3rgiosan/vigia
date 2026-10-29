@@ -73,13 +73,11 @@ export async function showRepoMenu(
     await PredefinedMenuItem.new({ item: "Separator" }),
     await MenuItem.new({
       text: run ? "Copy Run Link" : "Copy Repository Link",
-      accelerator: "CmdOrCtrl+C",
       action: () => guard(copyLink(repo, run)),
     }),
     await PredefinedMenuItem.new({ item: "Separator" }),
     await MenuItem.new({
       text: "Stop Watching",
-      accelerator: "CmdOrCtrl+Backspace",
       action: () => guard(stopWatching(repo, onStopped)),
     }),
   ];

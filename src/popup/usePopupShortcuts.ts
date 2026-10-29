@@ -1,5 +1,6 @@
 import { useEffect, type RefObject } from "react";
 import { useLatest } from "../lib/hooks/useLatest";
+import { hasCommandModifier } from "../lib/platform";
 
 export interface PopupShortcuts {
   filterRef: RefObject<HTMLInputElement | null>;
@@ -12,6 +13,7 @@ export interface PopupShortcuts {
 /**
  * Window-level shortcuts: ⌘R refreshes, ⌘, opens Settings, ⌘F focuses the filter, Esc clears the
  * filter or closes the popup, and typing anywhere starts filtering, like type-to-select in Finder.
+ * Linux and Windows use Ctrl in place of ⌘.
  */
 export function usePopupShortcuts(options: PopupShortcuts): void {
   const latest = useLatest(options);
@@ -22,13 +24,14 @@ export function usePopupShortcuts(options: PopupShortcuts): void {
       const input = filterRef.current;
       const typingInFilter = document.activeElement === input;
       const plainCharacter = e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && e.key !== " ";
-      if (e.metaKey && e.key === "r") {
+      const command = hasCommandModifier(e);
+      if (command && e.key === "r") {
         e.preventDefault();
         refresh();
-      } else if (e.metaKey && e.key === ",") {
+      } else if (command && e.key === ",") {
         e.preventDefault();
         openSettings();
-      } else if (e.metaKey && e.key === "f") {
+      } else if (command && e.key === "f") {
         e.preventDefault();
         input?.focus();
         input?.select();
