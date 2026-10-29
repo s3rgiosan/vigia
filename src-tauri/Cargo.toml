@@ -1,6 +1,6 @@
 [package]
 name = "vigia"
-version = "1.2.3"
+version = "1.3.0"
 description = "Menu bar CI status for GitHub Actions and GitLab CI"
 authors = ["Sérgio Santos"]
 license = "MIT"
