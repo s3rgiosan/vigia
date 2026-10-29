@@ -627,7 +627,7 @@ pub trait TrayActions: Send + Sync + 'static {
 
 /// The About panel's contents. On macOS `version` fills the application version, the empty
 /// `short_version` hides the build number in parentheses, and `credits` shows the description.
-fn about_metadata(version: String) -> AboutMetadata<'static> {
+pub(crate) fn about_metadata(version: String) -> AboutMetadata<'static> {
     AboutMetadata {
         name: Some("Vigia".into()),
         version: Some(version),
@@ -636,6 +636,22 @@ fn about_metadata(version: String) -> AboutMetadata<'static> {
         credits: Some("CI status for GitHub Actions and GitLab CI, in the menu bar.".into()),
         ..Default::default()
     }
+}
+
+/// The popup footer's More menu: About Vigia, Settings… and Quit Vigia. Its items share the
+/// status item menu's ids, so the tray's menu handler runs them.
+pub fn more_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
+    let version = app.package_info().version.to_string();
+    Menu::with_items(
+        app,
+        &[
+            &PredefinedMenuItem::about(app, Some("About Vigia"), Some(about_metadata(version)))?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?,
+            &PredefinedMenuItem::separator(app)?,
+            &MenuItem::with_id(app, "quit", "Quit Vigia", true, None::<&str>)?,
+        ],
+    )
 }
 
 /// Builds the tray and returns it with the Pause item, whose label flips to Resume.
@@ -660,13 +676,14 @@ pub fn build<R: Runtime>(
     let menu = Menu::with_items(
         app,
         &[
+            &about,
+            &PredefinedMenuItem::separator(app)?,
             &open,
             &PredefinedMenuItem::separator(app)?,
             &refresh,
             &pause,
             &PredefinedMenuItem::separator(app)?,
             &settings,
-            &about,
             &check_updates,
             &PredefinedMenuItem::separator(app)?,
             &quit,

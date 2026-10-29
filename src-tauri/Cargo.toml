@@ -45,6 +45,7 @@ tauri-plugin-clipboard-manager = "2"
 # Native TLS like the rest of the app; macOS installs the .app.tar.gz without the zip feature.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
 tauri-plugin-process = "2"
+tauri-plugin-dialog = "2"
 
 # Dependencies build without debug info to keep target/debug small; the app crate keeps it.
 [profile.dev.package."*"]
@@ -66,10 +67,11 @@ wiremock = "0.6.5"
 [lints.clippy]
 all = "deny"
 
-# AppKit access: the menu bar's appearance, the tray status badge, and the Settings toolbar.
+# AppKit access: the menu bar's appearance, the tray status badge, the Settings toolbar, and the
+# user's accent colour and Reduce Transparency setting.
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 # Already built for tauri-plugin-notification; used directly to learn when a notification is clicked.
 mac-notification-sys = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSArray", "NSString", "NSThread", "NSObject", "NSSet", "NSData", "NSGeometry"] }
-objc2-app-kit = { version = "0.3", features = ["NSAppearance", "NSStatusItem", "NSStatusBarButton", "NSButton", "NSControl", "NSView", "NSResponder", "NSToolbar", "NSToolbarItem", "NSWindow", "NSImage", "NSImageView", "NSCell", "NSGraphics", "NSAccessibilityProtocols"] }
+objc2-app-kit = { version = "0.3", features = ["NSAppearance", "NSStatusItem", "NSStatusBarButton", "NSButton", "NSControl", "NSView", "NSResponder", "NSToolbar", "NSToolbarItem", "NSWindow", "NSImage", "NSImageView", "NSCell", "NSGraphics", "NSAccessibilityProtocols", "NSAccessibility", "NSColor", "NSColorSpace", "NSWorkspace"] }

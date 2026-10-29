@@ -1,5 +1,8 @@
 pub mod aggregate;
 pub mod app;
+#[cfg(target_os = "macos")]
+mod app_menu;
+pub mod appearance;
 pub mod commands;
 pub mod config;
 #[cfg(debug_assertions)]
@@ -23,6 +26,7 @@ mod settings_toolbar;
 mod tray;
 pub mod updates;
 pub mod windows;
+pub mod zoom;
 
 use std::sync::Arc;
 
@@ -129,7 +133,13 @@ fn publish(app: &AppHandle, snapshot: &Snapshot) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // The menu bar shows while Settings is open; Linux and Windows have none.
+    #[cfg(target_os = "macos")]
+    let builder = builder
+        .menu(app_menu::build)
+        .on_menu_event(|app, event| app_menu::handle_event(app, &event));
+    builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .level(if cfg!(debug_assertions) {
@@ -149,6 +159,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -159,6 +170,10 @@ pub fn run() {
             commands::set_paused,
             commands::open_url,
             commands::hide_popup,
+            commands::get_system_appearance,
+            commands::confirm_destructive,
+            commands::zoom_window,
+            commands::show_more_menu,
             commands::open_settings,
             commands::get_settings,
             commands::test_connection,
@@ -300,6 +315,7 @@ pub fn run() {
             app.manage(updates);
             app.manage(repo_lists);
             app.manage(settings::UnwatchedRepos::default());
+            app.manage(zoom::ZoomLevels::default());
 
             tauri::async_runtime::spawn(async move {
                 #[cfg(debug_assertions)]
@@ -328,6 +344,10 @@ pub fn run() {
             tauri::RunEvent::Exit => {
                 app.state::<Arc<Runtime>>().controls.shutdown();
             }
+            // Opening Vigia again from Finder or Spotlight shows the popup, which also reaches
+            // the app when the menu bar is too full to show the status item.
+            #[cfg(target_os = "macos")]
+            tauri::RunEvent::Reopen { .. } => tray::show_popup(app),
             _ => {}
         });
 }

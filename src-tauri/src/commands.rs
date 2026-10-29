@@ -4,7 +4,7 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, WebviewWindow};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::app::Runtime;
@@ -194,6 +194,65 @@ pub fn open_url(
 #[tauri::command]
 pub fn hide_popup(app: AppHandle) {
     crate::tray::hide_popup(&app);
+}
+
+/// The user's accent colour and Reduce Transparency setting. Sync commands run on the main
+/// thread, where AppKit is read.
+#[tauri::command]
+pub fn get_system_appearance() -> crate::appearance::SystemAppearance {
+    crate::appearance::read()
+}
+
+/// Shows a native alert over the calling window with the confirming button and Cancel, and
+/// resolves to whether the user confirmed.
+#[tauri::command]
+pub async fn confirm_destructive(
+    window: WebviewWindow,
+    title: String,
+    message: String,
+    confirm_label: String,
+) -> bool {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+    let (sender, receiver) = tokio::sync::oneshot::channel();
+    window
+        .dialog()
+        .message(message)
+        .title(title)
+        .parent(&window)
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            confirm_label,
+            "Cancel".into(),
+        ))
+        .show(move |confirmed| {
+            let _ = sender.send(confirmed);
+        });
+    receiver.await.unwrap_or(false)
+}
+
+/// Zooms the calling window one step: `in`, `out` or `reset`. The popup has no zoom.
+#[tauri::command]
+pub fn zoom_window(
+    window: WebviewWindow,
+    levels: State<'_, crate::zoom::ZoomLevels>,
+    step: String,
+) -> CommandResult<()> {
+    let step = step.parse().map_err(|_| {
+        fail(CommandError::new(
+            ErrorKind::InvalidInput,
+            "unknown zoom step",
+        ))
+    })?;
+    crate::zoom::apply(&levels, &window, step);
+    Ok(())
+}
+
+/// Opens the popup's More menu at a position relative to the calling window.
+#[tauri::command]
+pub fn show_more_menu(app: AppHandle, window: WebviewWindow, x: f64, y: f64) -> CommandResult<()> {
+    let menu = crate::tray::more_menu(&app).map_err(|e| fail(CommandError::internal(e)))?;
+    window
+        .popup_menu_at(&menu, tauri::LogicalPosition::new(x, y))
+        .map_err(|e| fail(CommandError::internal(e)))
 }
 
 /// Opens GitHub's fine-grained token form, prefilled with the grants Vigia needs.
