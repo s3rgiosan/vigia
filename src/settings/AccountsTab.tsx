@@ -2,19 +2,26 @@ import { useEffect, useRef, useState } from "react";
 import { FormRow, FormSection } from "../components/Form";
 import { Icon } from "../components/Icon";
 import { ActionPopUpButton } from "../components/PopUpButton";
-import { Sheet } from "../components/Sheet";
 import { authReason, authSettingsMessage } from "../lib/auth";
 import { friendlyError } from "../lib/errors";
 import { useLatest } from "../lib/hooks/useLatest";
 import { useRovingListbox } from "../lib/hooks/useRovingListbox";
 import type { AccountSnapshot } from "../lib/snapshot";
-import { deleteAccount, deleteAllAccounts, renameAccount, replaceToken, type Account } from "../lib/tauri";
+import {
+  confirmDestructive,
+  deleteAccount,
+  deleteAllAccounts,
+  renameAccount,
+  replaceToken,
+  type Account,
+  type DestructiveConfirmation,
+} from "../lib/tauri";
 import { AddAccountSheet, ReplaceTokenSheet } from "./AccountSheets";
 import { accountStatus, hostOf, pluralize, providerName } from "./accounts";
 import { useSettings, type SheetRequest } from "./SettingsContext";
 import { SECRET_STORE } from "../lib/platform";
 
-type SheetKind = "add" | "replace" | "remove" | "removeAll" | null;
+type SheetKind = "add" | "replace" | null;
 
 export function AccountsTab({
   request,
@@ -28,7 +35,6 @@ export function AccountsTab({
   const { accounts } = view;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sheet, setSheet] = useState<SheetKind>(null);
-  const [removing, setRemoving] = useState(false);
   const optionRefs = useRef<(HTMLLIElement | null)[]>([]);
 
   const selected = accounts.find((a) => a.id === selectedId) ?? accounts[0] ?? null;
@@ -76,15 +82,39 @@ export function AccountsTab({
     }
   }
 
-  async function confirmRemoval(action: () => Promise<unknown>) {
-    setRemoving(true);
+  /** Asks with a native alert, then runs the removal once the user confirms. */
+  async function confirmRemoval(confirmation: DestructiveConfirmation, action: () => Promise<unknown>) {
     try {
-      if (await run(action)) {
-        setSheet(null);
+      const confirmed = await confirmDestructive(confirmation);
+      if (confirmed) {
+        await run(action);
       }
-    } finally {
-      setRemoving(false);
+    } catch (e) {
+      setError(friendlyError(e));
     }
+  }
+
+  function removeSelected(account: Account) {
+    const repos = pluralize(repoCount(account.id), "repository", "repositories");
+    void confirmRemoval(
+      {
+        title: `Remove “${account.label}”?`,
+        message: `Vigia stops watching its ${repos} and deletes its token from the ${SECRET_STORE.store}. The token itself stays valid on ${providerName(account.kind)}.`,
+        confirmLabel: "Remove",
+      },
+      () => deleteAccount(account.id),
+    );
+  }
+
+  function removeAll() {
+    void confirmRemoval(
+      {
+        title: `Remove all ${accounts.length} accounts?`,
+        message: `Vigia stops watching every repository and deletes all tokens from the ${SECRET_STORE.store}. Your other settings stay.`,
+        confirmLabel: "Remove All",
+      },
+      () => deleteAllAccounts(),
+    );
   }
 
   const addSheet =
@@ -151,7 +181,7 @@ export function AccountsTab({
             </button>
             <button
               type="button"
-              onClick={() => setSheet("remove")}
+              onClick={() => removeSelected(selected)}
               disabled={readOnly}
               title="Remove Account"
               aria-label="Remove account"
@@ -161,7 +191,7 @@ export function AccountsTab({
           </div>
           <ActionPopUpButton
             disabled={readOnly}
-            actions={[{ label: "Remove All Accounts…", onSelect: () => setSheet("removeAll"), disabled: accounts.length < 2 }]}
+            actions={[{ label: "Remove All Accounts…", onSelect: removeAll, disabled: accounts.length < 2 }]}
           />
         </div>
       </div>
@@ -192,31 +222,6 @@ export function AccountsTab({
         />
       ) : null}
 
-      {sheet === "remove" ? (
-        <Sheet
-          title={`Remove “${selected.label}”?`}
-          message={`Vigia stops watching its ${pluralize(repoCount(selected.id), "repository", "repositories")} and deletes its token from the ${SECRET_STORE.store}. The token itself stays valid on ${providerName(selected.kind)}.`}
-          submitLabel="Remove"
-          destructive
-          busy={removing}
-          busyLabel="Removing…"
-          onCancel={() => setSheet(null)}
-          onSubmit={() => confirmRemoval(() => deleteAccount(selected.id))}
-        />
-      ) : null}
-
-      {sheet === "removeAll" ? (
-        <Sheet
-          title={`Remove all ${accounts.length} accounts?`}
-          message={`Vigia stops watching every repository and deletes all tokens from the ${SECRET_STORE.store}. Your other settings stay.`}
-          submitLabel="Remove All"
-          destructive
-          busy={removing}
-          busyLabel="Removing…"
-          onCancel={() => setSheet(null)}
-          onSubmit={() => confirmRemoval(() => deleteAllAccounts())}
-        />
-      ) : null}
     </div>
   );
 }

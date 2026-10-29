@@ -1,7 +1,7 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon, type IconName } from "../components/Icon";
-import { OpenSheetsContext, Sheet, SheetNote } from "../components/Sheet";
+import { OpenSheetsContext } from "../components/Sheet";
 import { friendlyError } from "../lib/errors";
 import { useLatest } from "../lib/hooks/useLatest";
 import { useSafeStorage } from "../lib/hooks/useSafeStorage";
@@ -9,6 +9,7 @@ import { isPreview } from "../lib/preview";
 import type { Snapshot } from "../lib/snapshot";
 import {
   getSettings,
+  confirmDestructive,
   getSnapshot,
   onSettingsOpen,
   onSettingsPane,
@@ -17,9 +18,11 @@ import {
   retrySecrets,
   selectSettingsPane,
   subscribe,
+  zoomWindow,
   type SettingsOpen,
   type SettingsPane,
   type SettingsView,
+  type ZoomStep,
 } from "../lib/tauri";
 import { AccountsTab } from "./AccountsTab";
 import { BranchesTab } from "./BranchesTab";
@@ -28,7 +31,7 @@ import { ReposTab } from "./ReposTab";
 import { SettingsContext, type SettingsContextValue, type SheetRequest } from "./SettingsContext";
 import { useSettingsSaver } from "./useSettingsSaver";
 import "./Settings.css";
-import { IS_MACOS, SECRET_STORE } from "../lib/platform";
+import { hasCommandModifier, IS_MACOS, SECRET_STORE } from "../lib/platform";
 
 const PANES: { id: SettingsPane; title: string; icon: IconName }[] = [
   { id: "accounts", title: "Accounts", icon: "person" },
@@ -55,6 +58,21 @@ export function sheetRequestOf(sheet: string | null, accountId: string | null): 
   }
 }
 
+/** The zoom step a key names with the command modifier held: 0 resets, = and + zoom in, - zooms out. */
+export function zoomStepFor(key: string): ZoomStep | null {
+  switch (key) {
+    case "0":
+      return "reset";
+    case "=":
+    case "+":
+      return "in";
+    case "-":
+      return "out";
+    default:
+      return null;
+  }
+}
+
 function searchParam(name: string): string | null {
   return new URLSearchParams(window.location.search).get(name);
 }
@@ -75,9 +93,7 @@ export function Settings() {
   const [view, setView] = useState<SettingsView | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
-  const [resetError, setResetError] = useState<string | null>(null);
   const openSheets = useRef(0);
   const latestRequest = useRef(0);
   const currentPane = useLatest(pane);
@@ -152,22 +168,28 @@ export function Settings() {
       });
   }, [reload]);
 
+  /** Asks with a native alert, then replaces the unreadable store item with an empty one. */
   async function confirmReset() {
     setResetting(true);
     try {
+      const confirmed = await confirmDestructive({
+        title: `Reset ${SECRET_STORE.itemTitle}?`,
+        message: `Vigia replaces its unreadable ${SECRET_STORE.item} with an empty one. All stored tokens are removed and must be entered again for every account.`,
+        confirmLabel: "Reset",
+      });
+      if (!confirmed) {
+        return;
+      }
       const reset = await resetSecrets();
       if (!reset) {
-        setResetError(`The ${SECRET_STORE.item} couldn’t be reset.`);
+        setError(`The ${SECRET_STORE.item} couldn’t be reset.`);
         return;
       }
       setError(null);
-      setResetError(null);
-      setResetOpen(false);
       await reload();
     } catch (e) {
       console.error("reset_secrets failed", e);
       setError(friendlyError(e));
-      setResetOpen(false);
     } finally {
       setResetting(false);
     }
@@ -208,13 +230,23 @@ export function Settings() {
     return subscribe(onSettingsOpen(showTarget));
   }, [showTarget]);
 
-  // ⌘1 to ⌘4 switch panes.
+  // ⌘1 to ⌘4 switch panes (Ctrl on Linux and Windows). On Linux and Windows, which have no
+  // View menu, Ctrl+0, Ctrl+= and Ctrl+- zoom the window; on macOS the View menu owns them.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (!hasCommandModifier(e, IS_MACOS)) {
+        return;
+      }
       const index = Number(e.key) - 1;
-      if (e.metaKey && index >= 0 && index < PANES.length) {
+      if (index >= 0 && index < PANES.length) {
         e.preventDefault();
         switchPane(PANES[index].id);
+        return;
+      }
+      const step = IS_MACOS ? null : zoomStepFor(e.key);
+      if (step && !isPreview()) {
+        e.preventDefault();
+        zoomWindow(step).catch((error) => console.error("could not zoom", error));
       }
     }
     window.addEventListener("keydown", onKey);
@@ -268,13 +300,7 @@ export function Settings() {
               <button type="button" onClick={retry}>
                 Try Again
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setResetError(null);
-                  setResetOpen(true);
-                }}
-              >
+              <button type="button" onClick={confirmReset} disabled={resetting}>
                 Reset {SECRET_STORE.itemTitle}…
               </button>
             </div>
@@ -299,20 +325,6 @@ export function Settings() {
           ) : null}
         </div>
 
-        {resetOpen ? (
-          <Sheet
-            title={`Reset ${SECRET_STORE.itemTitle}?`}
-            message={`Vigia replaces its unreadable ${SECRET_STORE.item} with an empty one. All stored tokens are removed and must be entered again for every account.`}
-            submitLabel="Reset"
-            destructive
-            busy={resetting}
-            busyLabel="Resetting…"
-            onCancel={() => setResetOpen(false)}
-            onSubmit={confirmReset}
-          >
-            {resetError ? <SheetNote>{resetError}</SheetNote> : null}
-          </Sheet>
-        ) : null}
       </main>
     </OpenSheetsContext.Provider>
   );

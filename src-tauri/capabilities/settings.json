@@ -9,6 +9,9 @@
     "core:app:allow-version",
     "core:event:allow-listen",
     "core:event:allow-unlisten",
+    "core:menu:allow-new",
+    "core:menu:allow-popup",
+    "core:resources:allow-close",
     "core:window:allow-set-title"
   ]
 }

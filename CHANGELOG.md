@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- While Settings is open on macOS, the menu bar has Settings…, Show All, Delete, Vigia Help, Bring All to Front, and View → Actual Size, Zoom In and Zoom Out for the Settings window.
+- On Linux and Windows, Ctrl+0, Ctrl+= and Ctrl+- zoom the Settings window.
+- The popup footer has Settings… and a More button with About Vigia, Settings… and Quit Vigia.
+- Opening Vigia again from Finder or Spotlight shows the popup.
+
+### Changed
+
+- Text follows the macOS text styles: a larger popup title, bold list headers, and 12-point help text in Settings.
+- Buttons, switches, checkboxes and selected rows follow the accent colour chosen in System Settings, and selected rows turn grey while their window is inactive.
+- Removing accounts and resetting the token store ask with a native alert.
+- The account actions button opens a native menu and shows a chevron.
+- The status item menu starts with About Vigia.
+- The Settings window opens centred and cannot be minimized.
+- Errors in the popup stay until dismissed, and error text, names and versions can be selected and copied.
+- Status dots have a darker edge, so they stand out on light backgrounds.
+- Focused controls show the system focus ring, and sheets also close with Command-Period.
+- Reduce Transparency makes the Settings groups and fields opaque.
+
+### Fixed
+
+- Popup shortcuts use Ctrl on Linux and Windows, and tooltips name Ctrl there.
+- Row context menus no longer show keyboard shortcuts.
+
 ## [1.2.3] - 2026-10-19
 
 ### Changed

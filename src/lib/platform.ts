@@ -5,6 +5,16 @@ const PLATFORM: string = import.meta.env.TAURI_ENV_PLATFORM ?? "darwin";
 /** Whether this build runs on macOS, where Settings has a native toolbar. */
 export const IS_MACOS = PLATFORM === "darwin";
 
+/** Whether the event holds the command modifier: ⌘ on macOS, Ctrl on Linux and Windows. */
+export function hasCommandModifier(e: { metaKey: boolean; ctrlKey: boolean }, macos: boolean = IS_MACOS): boolean {
+  return macos ? e.metaKey : e.ctrlKey;
+}
+
+/** A shortcut as the platform writes it: "⌘R" on macOS, "Ctrl+R" on Linux and Windows. */
+export function shortcutLabel(key: string, macos: boolean = IS_MACOS): string {
+  return macos ? `⌘${key}` : `Ctrl+${key}`;
+}
+
 /** Whether the popup opens above the tray icon, as on Windows, where the taskbar usually sits at the bottom. */
 export const POPUP_ABOVE_TRAY = PLATFORM === "windows";
 

@@ -46,13 +46,15 @@ AppKit code is behind `cfg(target_os = "macos")`, with no-op or plain Tauri fall
 | Window | Label | Size | Behavior |
 | --- | --- | --- | --- |
 | Popup | `popup` | 380 wide, height set by the page | Created hidden at launch. No decorations, always on top. On macOS it is transparent, with the `liquidGlassRegular` and `popover` window effects. Hides when it loses focus. |
-| Settings | `settings` | 680 x 560, fixed | Created on demand, focused when it already exists. On macOS it has a native AppKit preferences toolbar (`settings_toolbar.rs`) that the page disables while a sheet is open. |
+| Settings | `settings` | 680 x 560, fixed | Created on demand and centred, focused when it already exists. It cannot be minimized, zoomed or resized. On macOS it has a native AppKit preferences toolbar (`settings_toolbar.rs`) that the page disables while a sheet is open. |
 
 Both windows load `index.html`; the `view` query parameter (`popup` or `settings`) selects the React view (`src/lib/view.ts`). Settings also accepts `pane` (`accounts`, `repos`, `branches`, `general`; the `branches` pane is titled Filters), `sheet` (`add`, or `replace` with an `account` parameter naming an existing account), and `account`; unknown values are dropped, and a `replace` sheet without a known account is dropped with it (`SettingsTarget`, `SettingsPane` and `SettingsSheet` in `windows.rs`).
 
 ### Tray and activation policy
 
-The app starts with the Accessory activation policy, so it has no Dock icon. While Settings is open the policy is Regular, which lets the window take keyboard focus; it returns to Accessory when Settings is destroyed. Closing every window does not exit the app (`ExitRequested` is prevented); Quit in the tray menu exits.
+The app starts with the Accessory activation policy, so it has no Dock icon. While Settings is open the policy is Regular, which lets the window take keyboard focus; it returns to Accessory when Settings is destroyed. Closing every window does not exit the app (`ExitRequested` is prevented); Quit in the tray menu exits. Opening the app again from Finder or Spotlight (`RunEvent::Reopen`) shows the popup.
+
+On macOS the app sets its own menu bar (`app_menu.rs`), visible while the policy is Regular: Vigia (About Vigia, Settings… Cmd+,, Services, Hide Vigia, Hide Others, Show All, Quit Vigia Cmd+Q), File (Close Window), Edit (Undo, Redo, Cut, Copy, Paste, Delete, Select All), View (Actual Size Cmd+0, Zoom In Cmd+=, Zoom Out Cmd+-), Window (Minimize, Zoom, Bring All to Front) and Help (Vigia Help, which opens the README). Settings… and Quit Vigia share the tray menu's IDs, so the tray's menu handler runs them. Zoom steps the focused window through fixed levels from 75% to 200%, kept per window in `zoom::ZoomLevels`; the popup has no zoom. Linux and Windows have no menu bar, and the Settings page zooms itself with Ctrl+0, Ctrl+= and Ctrl+- through `zoom_window`. `docs/wiring.md` lists every menu item, shortcut and permission with its handler.
 
 The tray icon (`tray.rs`) is the porthole mark as a template image. A status badge is composited on its lower right corner:
 
@@ -64,7 +66,7 @@ The tray icon (`tray.rs`) is the porthole mark as a template image. A status bad
 
 Linux and Windows show tray images untinted and have no status item to lay a badge over, so each look there is one finished image (`solid-<look>@2x.png`): the porthole in white with the dark-menu-bar badge drawn into its notch.
 
-Badge artwork exists for light and dark menu bars. A zero-sized view added to the status item receives `viewDidChangeEffectiveAppearance` when the menu bar turns light or dark, and the icon is redrawn then. The status item's accessibility label is `Vigia, <tooltip>`, kept in step with the tooltip. A left click toggles the popup. A click within 200 ms of a blur-triggered hide does not reopen it. The right-click menu has Open Vigia, Refresh Now (Cmd+R), Pause or Resume, Settings (Cmd+,), About, Check for Updates, and Quit (Cmd+Q). The About panel shows the version once (the build number is hidden) and the description as its credits. Debug builds add a Debug submenu that forces each look.
+Badge artwork exists for light and dark menu bars. A zero-sized view added to the status item receives `viewDidChangeEffectiveAppearance` when the menu bar turns light or dark, and the icon is redrawn then. The status item's accessibility label is `Vigia, <tooltip>`, kept in step with the tooltip. A left click toggles the popup. A click within 200 ms of a blur-triggered hide does not reopen it. The right-click menu has About Vigia, Open Vigia, Refresh Now (Cmd+R), Pause or Resume, Settings… (Cmd+,), Check for Updates…, and Quit Vigia (Cmd+Q). The popup footer's More button opens a menu with About Vigia, Settings… and Quit Vigia (`tray::more_menu`), using the same IDs. The About panel shows the version once (the build number is hidden) and the description as its credits. Debug builds add a Debug submenu that forces each look.
 
 The popup is placed by the tray icon with `tauri-plugin-positioner` (`tray::place_popup`): under it on macOS and Linux, and above it on Windows, constrained to the screen, where it moves below the icon when the taskbar is at the top. On Windows each resize of the visible popup places it again, so it grows upward from the taskbar. When the tray rectangle is unknown, as always on Linux, it falls back to below the icon, then to the top-right of the primary monitor's work area. Wayland ignores window positions, so there the compositor places the popup.
 
@@ -74,12 +76,13 @@ The popup is placed by the tray icon with `tauri-plugin-positioner` (`tray::plac
 
 ### Webview to Rust
 
-The webview calls Rust through the commands in `commands.rs` (30 in `invoke_handler`):
+The webview calls Rust through the commands in `commands.rs` (34 in `invoke_handler`):
 
 | Group | Commands |
 | --- | --- |
 | Status | `get_snapshot`, `refresh_now`, `set_paused` |
-| Windows and links | `hide_popup`, `open_settings`, `select_settings_pane`, `set_settings_toolbar_enabled`, `open_url`, `open_github_token_page` |
+| Windows and links | `hide_popup`, `show_more_menu`, `open_settings`, `select_settings_pane`, `set_settings_toolbar_enabled`, `zoom_window`, `confirm_destructive`, `open_url`, `open_github_token_page` |
+| Appearance | `get_system_appearance` |
 | Settings read | `get_settings` |
 | Accounts | `test_connection`, `add_account`, `rename_account`, `replace_token`, `delete_account`, `delete_all_accounts` |
 | Organizations | `set_org_filters` |
@@ -88,7 +91,7 @@ The webview calls Rust through the commands in `commands.rs` (30 in `invoke_hand
 | Keychain | `retry_secrets`, `reset_secrets` |
 | Updates | `check_for_updates_now`, `install_update` |
 
-`open_settings` takes an optional `pane`, `sheet` (`add` or `replace`) and `account_id`. `set_settings_toolbar_enabled` enables or disables every toolbar item. `clear_repo_overrides` clears a repo's branch, workflow and tag overrides in one step.
+`open_settings` takes an optional `pane`, `sheet` (`add` or `replace`) and `account_id`. `get_system_appearance` returns the accent colour as `#rrggbb` (`null` off macOS) and whether Reduce Transparency is on; `src/lib/systemAppearance.ts` sets them as `--accent` and the `reduce-transparency` class on each window's root, reads them again on focus and on a light or dark change, and sets `window-inactive` while the window is unfocused. `confirm_destructive` shows a native alert (`tauri-plugin-dialog`) as a sheet on the calling window and resolves to whether the user confirmed. `set_settings_toolbar_enabled` enables or disables every toolbar item. `clear_repo_overrides` clears a repo's branch, workflow and tag overrides in one step.
 
 A failed command rejects with `{ kind, message }`. `kind` is one of `unauthorized`, `forbidden`, `not_found`, `rate_limited`, `network`, `server`, `redirected`, `decode`, `keychain`, `read_only`, `invalid_input`, `unknown_account` or `internal`; `message` is the display text and never contains a token. Expected failures are logged at debug level; `decode`, `keychain` and `internal` faults at warn. Typed wrappers for the frontend are in `src/lib/tauri.ts`, and `friendlyError` (section 8) turns a rejection into a sentence by its kind.
 
@@ -112,9 +115,9 @@ Every config-changing command ends with `Runtime::restart` (section 5), so the b
 | File | Window | Permissions |
 | --- | --- | --- |
 | `popup.json` | `popup` | event listen and unlisten, menu creation and popup (native context menus), resource close, `core:window:allow-set-size` (content-fitted height), clipboard write |
-| `settings.json` | `settings` | `core:app:allow-version` (the version row), event listen and unlisten, `core:window:allow-set-title` |
+| `settings.json` | `settings` | `core:app:allow-version` (the version row), event listen and unlisten, menu creation and popup and resource close (the native pull-down menu), `core:window:allow-set-title` |
 
-The app's own commands have no per-command permission entries, so both windows can invoke them. Neither window has filesystem, shell, HTTP, updater or process permissions; updates go through the app's own commands.
+The app's own commands have no per-command permission entries, so both windows can invoke them. Neither window has filesystem, shell, HTTP, updater, process or dialog permissions; updates and alerts go through the app's own commands.
 
 ## 3. Domain model
 

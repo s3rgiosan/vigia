@@ -340,3 +340,38 @@ export function setRepoIgnoredWorkflows(accountId: string, repoId: number, patte
 export function setRepoIncludeTags(accountId: string, repoId: number, include: boolean | null): Promise<void> {
   return invoke("set_repo_include_tags", { accountId, repoId, include });
 }
+
+/** The user's accent colour (`#rrggbb`, or null where the platform reports none) and Reduce Transparency. */
+export interface SystemAppearance {
+  accent: string | null;
+  reduce_transparency: boolean;
+}
+
+export function getSystemAppearance(): Promise<SystemAppearance | null> {
+  return invoke("get_system_appearance");
+}
+
+/** A destructive confirmation shown as a native alert over the calling window. */
+export interface DestructiveConfirmation {
+  title: string;
+  message: string;
+  /** The verb on the confirming button, such as "Remove". */
+  confirmLabel: string;
+}
+
+/** Shows a native alert and resolves to whether the user chose the confirming button. */
+export function confirmDestructive({ title, message, confirmLabel }: DestructiveConfirmation): Promise<boolean> {
+  return invoke("confirm_destructive", { title, message, confirmLabel });
+}
+
+export type ZoomStep = "in" | "out" | "reset";
+
+/** Zooms the calling window one step. */
+export function zoomWindow(step: ZoomStep): Promise<void> {
+  return invoke("zoom_window", { step });
+}
+
+/** Opens the native menu with About, Settings… and Quit at a window-relative position. */
+export function showMoreMenu(x: number, y: number): Promise<void> {
+  return invoke("show_more_menu", { x, y });
+}

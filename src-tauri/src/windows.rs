@@ -251,8 +251,9 @@ fn open_settings_on_main(app: &AppHandle, target: SettingsTarget) {
             .title(target.initial_pane().title())
             .inner_size(SETTINGS_WIDTH, SETTINGS_HEIGHT)
             .resizable(false)
-            .minimizable(true)
+            .minimizable(false)
             .maximizable(false)
+            .center()
             .build();
 
     match built {
@@ -260,6 +261,9 @@ fn open_settings_on_main(app: &AppHandle, target: SettingsTarget) {
             let handle = app.clone();
             window.on_window_event(move |event| {
                 if let WindowEvent::Destroyed = event {
+                    handle
+                        .state::<crate::zoom::ZoomLevels>()
+                        .forget(SETTINGS_LABEL);
                     #[cfg(target_os = "macos")]
                     {
                         let app = handle.clone();
@@ -268,8 +272,6 @@ fn open_settings_on_main(app: &AppHandle, target: SettingsTarget) {
                             let _ = app.set_activation_policy(tauri::ActivationPolicy::Accessory);
                         });
                     }
-                    #[cfg(not(target_os = "macos"))]
-                    let _ = &handle;
                 }
             });
             // The pane switcher is a native preferences toolbar.

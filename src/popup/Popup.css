@@ -62,8 +62,9 @@
 }
 
 .popup__title strong {
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 22px;
 }
 
 .popup__title span {
@@ -71,6 +72,7 @@
   overflow: hidden;
   color: var(--label-secondary);
   font-size: 12px;
+  line-height: 15px;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
@@ -172,24 +174,20 @@
   border: 0;
   border-radius: var(--radius-row);
   background: none;
-  color: var(--label-secondary);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.section__header:hover {
   color: var(--label);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 16px;
 }
 
 .section__header:active {
   background: var(--fill);
-  color: var(--label);
 }
 
 .section__count {
   margin-left: auto;
   color: var(--label-secondary);
-  font-weight: 500;
+  font-weight: 400;
 }
 
 .disclosure {
@@ -204,7 +202,9 @@
 .group__title {
   padding: 5px 6px 2px 22px;
   color: var(--label-secondary);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
 }
 
 /* A repo is one 28 px line: disclosure · dot · name · detail · time · open mark. */
@@ -227,8 +227,8 @@
 }
 
 .repo__line:has(.row:focus-visible) {
-  background: var(--accent);
-  color: var(--accent-text);
+  background: var(--selection);
+  color: var(--selection-text);
 }
 
 .row,
@@ -262,8 +262,16 @@
 .run:focus-visible,
 .section__header:focus-visible {
   outline: none;
-  background: var(--accent);
-  color: var(--accent-text);
+  background: var(--selection);
+  color: var(--selection-text);
+}
+
+/* In an inactive window the focused row keeps an unemphasized highlight and label colours. */
+:root.window-inactive .repo__line:has(.row:focus-visible),
+:root.window-inactive .run:focus-visible,
+:root.window-inactive .section__header:focus-visible {
+  background: var(--selection-unfocused);
+  color: var(--label);
 }
 
 .row:focus-visible .row__detail,
@@ -309,7 +317,6 @@ button.row__disclosure:focus-visible {
   flex: none;
   max-width: 45%;
   overflow: hidden;
-  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -320,6 +327,7 @@ button.row__disclosure:focus-visible {
   overflow: hidden;
   color: var(--label-secondary);
   font-size: 12px;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -329,6 +337,7 @@ button.row__disclosure:focus-visible {
   flex: none;
   color: var(--label-secondary);
   font-size: 12px;
+  line-height: 15px;
   white-space: nowrap;
 }
 
@@ -367,7 +376,7 @@ button.row__disclosure:focus-visible {
   margin: 0 12px 6px 28px;
   color: var(--label-secondary);
   font-size: 12px;
-  line-height: 1.35;
+  line-height: 15px;
 }
 
 .runs {
@@ -381,6 +390,7 @@ button.row__disclosure:focus-visible {
   height: 24px;
   padding-left: 25px;
   font-size: 12px;
+  line-height: 15px;
 }
 
 .run__name {
@@ -397,17 +407,31 @@ button.row__disclosure:focus-visible {
   overflow: hidden;
   color: var(--label-secondary);
   font-size: 12px;
+  line-height: 15px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 /* Footer ------------------------------------------------------------------ */
 
+/* Footer: the update status, then Settings… and More. */
 .popup__footer {
-  padding: 7px 12px 10px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 8px 6px 12px;
   border-top: 0.5px solid var(--separator);
   color: var(--label-secondary);
   font-size: 12px;
+  line-height: 15px;
+}
+
+.popup__status {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*
@@ -444,15 +468,15 @@ button.row__disclosure:focus-visible {
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent,
-      #000 var(--edge-top),
-      #000 calc(100% - var(--edge-bottom)),
+      black var(--edge-top),
+      black calc(100% - var(--edge-bottom)),
       transparent
     );
     mask-image: linear-gradient(
       to bottom,
       transparent,
-      #000 var(--edge-top),
-      #000 calc(100% - var(--edge-bottom)),
+      black var(--edge-top),
+      black calc(100% - var(--edge-bottom)),
       transparent
     );
     /* Rows scrolled into view stop clear of the fade. */
@@ -503,12 +527,12 @@ button.row__disclosure:focus-visible {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
+  line-height: 20px;
 }
 
 .empty p {
   margin: 0 0 6px;
   color: var(--label-secondary);
-  line-height: 1.4;
 }
 
 /*

@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const showActionMenu = vi.fn();
+vi.mock("../lib/actionMenu", () => ({
+  showActionMenu: (...a: unknown[]) => showActionMenu(...a),
+}));
+
 import { ActionPopUpButton, PopUpButton } from "./PopUpButton";
 
 afterEach(cleanup);
@@ -66,26 +72,31 @@ describe("PopUpButton", () => {
 });
 
 describe("ActionPopUpButton", () => {
-  it("runs the chosen action and stays on its placeholder", () => {
-    const removeAll = vi.fn();
-    render(<ActionPopUpButton actions={[{ label: "Remove All…", onSelect: removeAll }]} />);
-    const menu = screen.getByRole("combobox", { name: "More Actions" }) as HTMLSelectElement;
-    fireEvent.change(menu, { target: { value: "0" } });
-    expect(removeAll).toHaveBeenCalledTimes(1);
-    expect(menu.value).toBe("");
+  it("opens a native menu of its actions under the button", () => {
+    showActionMenu.mockResolvedValue(undefined);
+    const actions = [{ label: "Remove All…", onSelect: vi.fn() }];
+    render(<ActionPopUpButton actions={actions} />);
+    const button = screen.getByRole("button", { name: "More Actions" });
+    expect(button.getAttribute("aria-haspopup")).toBe("menu");
+    fireEvent.click(button);
+    expect(showActionMenu).toHaveBeenCalledWith(actions, { x: 0, y: 4 });
   });
 
   it("is disabled when asked or when every action is unavailable", () => {
     const { rerender } = render(<ActionPopUpButton label="Actions" disabled actions={[{ label: "Go", onSelect: vi.fn() }]} />);
-    expect((screen.getByLabelText("Actions") as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Actions" }) as HTMLButtonElement).disabled).toBe(true);
     rerender(<ActionPopUpButton label="Actions" actions={[{ label: "Go", onSelect: vi.fn(), disabled: true }]} />);
-    expect((screen.getByLabelText("Actions") as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Actions" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
-  it("ignores a value that names no action", () => {
-    const go = vi.fn();
-    render(<ActionPopUpButton actions={[{ label: "Go", onSelect: go }]} />);
-    fireEvent.change(screen.getByLabelText("More Actions"), { target: { value: "" } });
-    expect(go).not.toHaveBeenCalled();
+  it("logs a menu that fails to open", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    showActionMenu.mockRejectedValue(new Error("no menu"));
+    render(<ActionPopUpButton actions={[{ label: "Go", onSelect: vi.fn() }]} />);
+    fireEvent.click(screen.getByRole("button", { name: "More Actions" }));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 });

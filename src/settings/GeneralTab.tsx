@@ -121,7 +121,7 @@ export function GeneralTab() {
           />
         </FormRow>
         <FormRow label="Version">
-          <span className="value">{version}</span>
+          <span className="value selectable">{version}</span>
         </FormRow>
         <FormRow label="Check now">
           <UpdateCheck />
